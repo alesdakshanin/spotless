@@ -33,5 +33,14 @@ Use the OpenSpec workflow (`/opsx:new`, `/opsx:ff`, `/opsx:apply`, etc.) for new
 ## Conventions
 
 - Always run `npm run check` after making changes to catch type errors, lint issues, and test failures
+- Run `npx @biomejs/biome check --write` before `npm run check` to auto-fix formatting — avoids iterative fix-and-recheck cycles
 - TypeScript strict mode is on with `noUncheckedIndexedAccess` — always handle potential undefined from array/object indexing
+- `noPropertyAccessFromIndexSignature` is enabled — when accessing dynamic/index-signature properties, declare them as explicit interface fields instead of using bracket notation (which conflicts with Biome's `useLiteralKeys` rule)
 - Biome handles all formatting — do not bikeshed style, just run the formatter
+
+## Testing
+
+- Vitest with jsdom environment (configured in `vitest.config.ts`)
+- `src/vite-env.d.ts` declares typed env vars on `ImportMetaEnv` — add new `VITE_*` vars there
+- Use `vi.stubEnv()` / `vi.unstubAllEnvs()` to mock Vite env vars in tests
+- Use `vi.stubGlobal()` for browser globals like `fetch`
