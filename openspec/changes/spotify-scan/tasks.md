@@ -13,10 +13,10 @@
 
 ## 2. Spotify Auth
 
-- [ ] 2.1 Implement `src/auth.ts` — PKCE helpers (code verifier, code challenge via Web Crypto), login redirect, callback handler, token exchange
-- [ ] 2.2 Add token storage in sessionStorage — save/load/clear access token, refresh token, expiry
-- [ ] 2.3 Add token refresh logic — detect expiry, call Spotify token endpoint with refresh token, update storage
-- [ ] 2.4 Write tests for auth module — PKCE generation, token storage, callback parsing
+- [x] 2.1 Implement `src/auth.ts` — PKCE helpers (code verifier, code challenge via Web Crypto), login redirect, callback handler, token exchange
+- [x] 2.2 Add token storage in sessionStorage — save/load/clear access token, refresh token, expiry
+- [x] 2.3 Add token refresh logic — detect expiry, call Spotify token endpoint with refresh token, update storage
+- [x] 2.4 Write tests for auth module — PKCE generation, token storage, callback parsing
 
 ## 3. Spotify API Client
 
