@@ -5,13 +5,15 @@ import { clearTokens, handleCallback, loadTokens, login, saveTokens } from "./au
 import { scan } from "./scanner";
 import type { SpotifyUser } from "./types";
 import {
+	markSourceComplete,
 	renderError,
 	renderLogin,
-	renderProgress,
+	renderProgressScreen,
 	renderResults,
 	renderScanScreen,
+	renderSourceList,
 	renderSpotless,
-	updateProgress,
+	updateSourceProgress,
 } from "./ui";
 
 async function showScanScreen(): Promise<void> {
@@ -22,19 +24,32 @@ async function showScanScreen(): Promise<void> {
 }
 
 async function startScan(): Promise<void> {
-	renderProgress();
+	renderProgressScreen();
 	let unplayableCount = 0;
+	let lastSource = "";
+	let lastScanned = 0;
 
 	try {
 		for await (const event of scan()) {
+			if (event.type === "sources") {
+				renderSourceList(event.names);
+			}
 			if (event.type === "progress") {
-				updateProgress(event.source, event.scanned, event.total, unplayableCount);
+				if (lastSource && lastSource !== event.source) {
+					markSourceComplete(lastSource, lastScanned);
+				}
+				lastSource = event.source;
+				lastScanned = event.scanned;
+				updateSourceProgress(event.source, event.scanned, event.total, unplayableCount);
 			}
 			if (event.type === "found") {
 				unplayableCount++;
-				updateProgress("", 0, 0, unplayableCount);
+				updateSourceProgress(lastSource, lastScanned, 0, unplayableCount);
 			}
 			if (event.type === "done") {
+				if (lastSource) {
+					markSourceComplete(lastSource, lastScanned);
+				}
 				if (event.summary.unplayable.length === 0) {
 					renderSpotless(event.summary.totalScanned, startScan);
 				} else {

@@ -60,6 +60,7 @@ export interface UnplayableTrack {
 }
 
 export type ScanEvent =
+	| { type: "sources"; names: string[] }
 	| { type: "progress"; source: string; scanned: number; total: number }
 	| { type: "found"; track: UnplayableTrack }
 	| { type: "done"; summary: ScanSummary };

@@ -102,43 +102,83 @@ export function renderScanScreen(
 
 // --- Progress display (5.3) ---
 
-let progressContainer: HTMLDivElement | null = null;
-let progressSource: HTMLParagraphElement | null = null;
-let progressCount: HTMLParagraphElement | null = null;
-let progressUnplayable: HTMLParagraphElement | null = null;
+interface SourceRow {
+	icon: HTMLSpanElement;
+	name: HTMLSpanElement;
+	status: HTMLSpanElement;
+}
 
-export function renderProgress(): void {
+let sourceRows: SourceRow[] = [];
+let sourceList: HTMLDivElement | null = null;
+let unplayableCounter: HTMLParagraphElement | null = null;
+
+export function renderProgressScreen(): void {
 	const app = getApp();
 	app.innerHTML = "";
 
-	progressSource = h("p", { class: "text-xl text-white font-medium" }, "Starting scan...");
-	progressCount = h("p", { class: "text-gray-400 text-lg mt-1" }, "");
-	progressUnplayable = h(
-		"p",
-		{ class: "text-gray-500 mt-4 text-sm" },
-		"Unplayable tracks found: 0",
-	);
+	sourceList = h("div", { class: "w-full max-w-md" });
+	unplayableCounter = h("p", { class: "text-gray-500 mt-6 text-sm" }, "Unplayable tracks found: 0");
 
-	progressContainer = h(
+	const container = h(
 		"div",
 		{ class: "min-h-screen flex flex-col items-center justify-center bg-gray-950 text-white px-4" },
 		h("h1", { class: "text-3xl font-bold mb-8 text-gray-500" }, "Spotless"),
-		h("div", { class: "text-center" }, progressSource, progressCount, progressUnplayable),
+		h("p", { class: "text-lg text-white font-medium mb-6" }, "Scanning your library..."),
+		sourceList,
+		unplayableCounter,
 	);
 
-	app.appendChild(progressContainer);
+	app.appendChild(container);
 }
 
-export function updateProgress(
+export function renderSourceList(names: string[]): void {
+	if (!sourceList) return;
+	sourceList.innerHTML = "";
+	sourceRows = [];
+
+	for (const name of names) {
+		const icon = h("span", { class: "text-gray-600 w-5 text-center shrink-0" }, "\u00B7");
+		const nameEl = h("span", { class: "text-gray-600 truncate" }, name);
+		const status = h("span", { class: "text-gray-700 text-sm shrink-0" });
+
+		const row = h("div", { class: "flex items-center gap-3 py-1.5" }, icon, nameEl, status);
+
+		sourceList.appendChild(row);
+		sourceRows.push({ icon, name: nameEl, status });
+	}
+}
+
+export function updateSourceProgress(
 	source: string,
 	scanned: number,
 	total: number,
 	unplayableCount: number,
 ): void {
-	if (progressSource) progressSource.textContent = `Scanning ${source}...`;
-	if (progressCount) progressCount.textContent = `${scanned} / ${total}`;
-	if (progressUnplayable)
-		progressUnplayable.textContent = `Unplayable tracks found: ${unplayableCount}`;
+	for (const row of sourceRows) {
+		if (row.name.textContent === source) {
+			row.icon.textContent = "\u25CF";
+			row.icon.className = "text-green-400 w-5 text-center shrink-0 animate-pulse";
+			row.name.className = "text-white truncate";
+			row.status.textContent = `${scanned} / ${total}`;
+			row.status.className = "text-gray-400 text-sm shrink-0";
+		}
+	}
+
+	if (unplayableCounter) {
+		unplayableCounter.textContent = `Unplayable tracks found: ${unplayableCount}`;
+	}
+}
+
+export function markSourceComplete(source: string, scanned: number): void {
+	for (const row of sourceRows) {
+		if (row.name.textContent === source) {
+			row.icon.textContent = "\u2713";
+			row.icon.className = "text-green-400 w-5 text-center shrink-0";
+			row.name.className = "text-gray-300 truncate";
+			row.status.textContent = `${scanned} tracks`;
+			row.status.className = "text-gray-500 text-sm shrink-0";
+		}
+	}
 }
 
 // --- Results display (5.4) ---

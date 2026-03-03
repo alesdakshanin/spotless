@@ -12,7 +12,11 @@ The system SHALL fetch all of the user's saved tracks (Liked Songs) from the Spo
 - **THEN** the system paginates through 50 pages of results, fetching all tracks
 
 ### Requirement: Scan user-owned playlists
-The system SHALL fetch the user's playlists via `GET /me/playlists` and scan only playlists owned by the current user. For each owned playlist, the system SHALL fetch all tracks via `GET /playlists/{id}/tracks` with `market=from_token`, paginating as needed.
+The system SHALL fetch the user's playlists via `GET /me/playlists` before scanning begins, filtering to only playlists owned by the current user. The system SHALL emit a sources event listing all scan sources (Liked Songs followed by owned playlist names) before any track scanning occurs. For each owned playlist, the system SHALL then fetch all tracks via `GET /playlists/{id}/tracks` with `market=from_token`, paginating as needed.
+
+#### Scenario: Sources event emitted before scanning
+- **WHEN** the user has 3 owned playlists ("Road Trip", "Chill Vibes", "Workout")
+- **THEN** the scanner emits a sources event with ["Liked Songs", "Road Trip", "Chill Vibes", "Workout"] before any track scanning begins
 
 #### Scenario: Scan owned playlists only
 - **WHEN** user owns 3 playlists and follows 5 playlists they don't own

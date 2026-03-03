@@ -78,12 +78,45 @@ async function* scanSource<T extends SpotifySavedTrack | SpotifyPlaylistTrack>(
 	} while (offset < total);
 }
 
+async function fetchOwnedPlaylists(userId: string): Promise<SpotifyPlaylist[]> {
+	const ownedPlaylists: SpotifyPlaylist[] = [];
+	let offset = 0;
+	let hasMore = true;
+
+	while (hasMore) {
+		const page = await get<SpotifyPaginatedResponse<SpotifyPlaylist>>(
+			`/me/playlists?limit=${PAGE_SIZE}&offset=${offset}`,
+		);
+
+		for (const playlist of page.items) {
+			if (playlist.owner.id === userId) {
+				ownedPlaylists.push(playlist);
+			}
+		}
+
+		hasMore = page.next !== null;
+		offset += PAGE_SIZE;
+	}
+
+	return ownedPlaylists;
+}
+
 export async function* scan(): AsyncGenerator<ScanEvent> {
 	const unplayable: UnplayableTrack[] = [];
 	let totalScanned = 0;
-	let likedSongsScanned = 0;
+
+	// Prefetch user and owned playlists before scanning
+	const user = await get<SpotifyUser>("/me");
+	const ownedPlaylists = await fetchOwnedPlaylists(user.id);
+
+	// Emit all source names upfront
+	yield {
+		type: "sources",
+		names: ["Liked Songs", ...ownedPlaylists.map((p) => p.name)],
+	};
 
 	// Scan Liked Songs
+	let likedSongsScanned = 0;
 	for await (const event of scanSource<SpotifySavedTrack>("/me/tracks", "Liked Songs")) {
 		if (event.type === "found") {
 			unplayable.push(event.track);
@@ -94,29 +127,6 @@ export async function* scan(): AsyncGenerator<ScanEvent> {
 		yield event;
 	}
 	totalScanned += likedSongsScanned;
-
-	// Get user ID for ownership check
-	const user = await get<SpotifyUser>("/me");
-
-	// Fetch playlists
-	let playlistOffset = 0;
-	let hasMorePlaylists = true;
-	const ownedPlaylists: SpotifyPlaylist[] = [];
-
-	while (hasMorePlaylists) {
-		const page = await get<SpotifyPaginatedResponse<SpotifyPlaylist>>(
-			`/me/playlists?limit=${PAGE_SIZE}&offset=${playlistOffset}`,
-		);
-
-		for (const playlist of page.items) {
-			if (playlist.owner.id === user.id) {
-				ownedPlaylists.push(playlist);
-			}
-		}
-
-		hasMorePlaylists = page.next !== null;
-		playlistOffset += PAGE_SIZE;
-	}
 
 	// Scan each owned playlist
 	for (const playlist of ownedPlaylists) {
