@@ -2,6 +2,8 @@
 
 Browser-based utility that scans a user's Spotify library and playlists for unplayable songs, helps find replacements via Spotify Search, and lets users remove dead tracks and add replacements.
 
+> `CLAUDE.md` is a symlink to `AGENTS.md`. The canonical file is `AGENTS.md` — always edit and `git add` that one.
+
 ## Tech Stack
 
 - Vite + vanilla TypeScript (no framework)
