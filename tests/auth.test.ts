@@ -133,6 +133,66 @@ describe("isTokenExpired", () => {
 	});
 });
 
+// --- Login redirect ---
+
+describe("login", () => {
+	let capturedHref: string | undefined;
+
+	beforeEach(() => {
+		sessionStorage.clear();
+		vi.stubEnv("VITE_SPOTIFY_CLIENT_ID", "test_client_id");
+
+		// Capture the href assignment instead of actually navigating
+		capturedHref = undefined;
+		Object.defineProperty(window, "location", {
+			value: {
+				...window.location,
+				origin: "http://localhost:3000",
+				pathname: "/",
+				href: "",
+			},
+			writable: true,
+			configurable: true,
+		});
+		Object.defineProperty(window.location, "href", {
+			set(value: string) {
+				capturedHref = value;
+			},
+			get() {
+				return capturedHref ?? "";
+			},
+			configurable: true,
+		});
+	});
+
+	afterEach(() => {
+		sessionStorage.clear();
+		vi.restoreAllMocks();
+		vi.unstubAllEnvs();
+	});
+
+	it("stores PKCE verifier in sessionStorage and redirects to Spotify authorize URL with correct params", async () => {
+		const { login } = await import("../src/auth");
+		await login();
+
+		// Verify verifier was stored
+		const verifier = sessionStorage.getItem("pkce_code_verifier");
+		expect(verifier).toBeTruthy();
+		expect(typeof verifier).toBe("string");
+
+		// Verify redirect URL
+		if (!capturedHref) throw new Error("Expected redirect URL to be set");
+		const url = new URL(capturedHref);
+		expect(url.origin + url.pathname).toBe("https://accounts.spotify.com/authorize");
+		expect(url.searchParams.get("client_id")).toBe("test_client_id");
+		expect(url.searchParams.get("response_type")).toBe("code");
+		expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+		expect(url.searchParams.get("code_challenge")).toBeTruthy();
+		expect(url.searchParams.get("scope")).toContain("user-library-read");
+		expect(url.searchParams.get("redirect_uri")).toBeTruthy();
+	});
+});
+
 // --- Callback handling ---
 
 describe("handleCallback", () => {
