@@ -1,9 +1,9 @@
 ## 0. Tooling Setup
 
-- [ ] 0.1 Install and configure Biome — add `biome.json`, add format/lint scripts to `package.json`
-- [ ] 0.2 Install and configure Tailwind CSS — `@tailwindcss/vite` plugin, update `src/style.css` with Tailwind import
-- [ ] 0.3 Tighten `tsconfig.json` — add `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`
-- [ ] 0.4 Add `npm run check` script — `tsc --noEmit && biome check && vitest run`
+- [x] 0.1 Install and configure Biome — add `biome.json`, add format/lint scripts to `package.json`
+- [x] 0.2 Install and configure Tailwind CSS — `@tailwindcss/vite` plugin, update `src/style.css` with Tailwind import
+- [x] 0.3 Tighten `tsconfig.json` — add `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`
+- [x] 0.4 Add `npm run check` script — `tsc --noEmit && biome check && vitest run`
 
 ## 1. Project Setup
 

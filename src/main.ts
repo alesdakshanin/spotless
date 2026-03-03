@@ -1,3 +1,3 @@
-const app = document.querySelector<HTMLDivElement>('#app')!
+const app = document.querySelector<HTMLDivElement>("#app")!;
 
-app.innerHTML = '<h1>Spotless</h1>'
+app.innerHTML = "<h1>Spotless</h1>";
