@@ -20,26 +20,26 @@
 
 ## 3. Spotify API Client
 
-- [ ] 3.1 Implement `src/api.ts` — fetch wrapper that attaches Bearer token, auto-refreshes on 401, handles 429 rate limiting with Retry-After
-- [ ] 3.2 Write tests for API client — token attachment, 401 refresh retry, 429 backoff
+- [x] 3.1 Implement `src/api.ts` — fetch wrapper that attaches Bearer token, auto-refreshes on 401, handles 429 rate limiting with Retry-After
+- [x] 3.2 Write tests for API client — token attachment, 401 refresh retry, 429 backoff
 
 ## 4. Library Scanner
 
-- [ ] 4.1 Implement `src/scanner.ts` — async generator that scans Liked Songs (paginated, market=from_token), yields progress and found events
-- [ ] 4.2 Add playlist scanning — fetch user's playlists, filter to owned, scan each playlist's tracks with pagination
-- [ ] 4.3 Add unplayable detection — check `is_playable`, map `restrictions.reason` to human-readable messages, skip `is_local` tracks
-- [ ] 4.4 Write tests for scanner — unplayable detection logic, local file skipping, progress event emission
+- [x] 4.1 Implement `src/scanner.ts` — async generator that scans Liked Songs (paginated, market=from_token), yields progress and found events
+- [x] 4.2 Add playlist scanning — fetch user's playlists, filter to owned, scan each playlist's tracks with pagination
+- [x] 4.3 Add unplayable detection — check `is_playable`, map `restrictions.reason` to human-readable messages, skip `is_local` tracks
+- [x] 4.4 Write tests for scanner — unplayable detection logic, local file skipping, progress event emission
 
 ## 5. UI
 
-- [ ] 5.1 Implement `src/ui.ts` — login screen with "Log in with Spotify" button
-- [ ] 5.2 Add scan screen — display user name, logout button, "Scan Library" button
-- [ ] 5.3 Add progress display — live "Scanning [source]... X / Y" with running unplayable count
-- [ ] 5.4 Add results display — list unplayable tracks (name, artist, source, reason), summary stats, "Scan Again" button
-- [ ] 5.5 Add "Your library is spotless!" happy path for clean results
+- [x] 5.1 Implement `src/ui.ts` — login screen with "Log in with Spotify" button
+- [x] 5.2 Add scan screen — display user name, logout button, "Scan Library" button
+- [x] 5.3 Add progress display — live "Scanning [source]... X / Y" with running unplayable count
+- [x] 5.4 Add results display — list unplayable tracks (name, artist, source, reason), summary stats, "Scan Again" button
+- [x] 5.5 Add "Your library is spotless!" happy path for clean results
 
 ## 6. Integration
 
-- [ ] 6.1 Wire up `src/main.ts` — app entry point, screen routing (login → scan → progress → results), OAuth callback handling
-- [ ] 6.2 Style the app with Tailwind utility classes
-- [ ] 6.3 Manual end-to-end test with a real Spotify account
+- [x] 6.1 Wire up `src/main.ts` — app entry point, screen routing (login → scan → progress → results), OAuth callback handling
+- [x] 6.2 Style the app with Tailwind utility classes
+- [x] 6.3 Manual end-to-end test with a real Spotify account
