@@ -7,9 +7,9 @@
 
 ## 1. Project Setup
 
-- [ ] 1.1 Create `src/types.ts` with shared types: `UnplayableTrack`, `ScanEvent`, `ScanSummary`, Spotify API response types
-- [ ] 1.2 Add `.env.example` with `VITE_SPOTIFY_CLIENT_ID` placeholder and update `.gitignore` for `.env`
-- [ ] 1.3 Add `DEVELOPMENT.md` — document Spotify app setup: creating a Spotify app in the developer dashboard, configuring redirect URIs for both `http://localhost:5173/` and the production GitHub Pages URL, copying the client ID into `.env`
+- [x] 1.1 Create `src/types.ts` with shared types: `UnplayableTrack`, `ScanEvent`, `ScanSummary`, Spotify API response types
+- [x] 1.2 Add `.env.example` with `VITE_SPOTIFY_CLIENT_ID` placeholder and update `.gitignore` for `.env`
+- [x] 1.3 Add `DEVELOPMENT.md` — document Spotify app setup: creating a Spotify app in the developer dashboard, configuring redirect URIs for both `http://localhost:5173/` and the production GitHub Pages URL, copying the client ID into `.env`
 
 ## 2. Spotify Auth
 
