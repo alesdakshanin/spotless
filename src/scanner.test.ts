@@ -23,6 +23,25 @@ function makeTrack(name: string, playable = true) {
 		id: name,
 		name,
 		artists: [{ id: "a1", name: "Artist" }],
+		album: {
+			name: `${name} Album`,
+			images: [
+				{ url: "https://img/large.jpg", height: 640, width: 640 },
+				{ url: "https://img/medium.jpg", height: 300, width: 300 },
+				{ url: "https://img/small.jpg", height: 64, width: 64 },
+			],
+		},
+		is_playable: playable,
+		is_local: false,
+	};
+}
+
+function makeTrackNoArt(name: string, playable = true) {
+	return {
+		id: name,
+		name,
+		artists: [{ id: "a1", name: "Artist" }],
+		album: { name: `${name} Album`, images: [] },
 		is_playable: playable,
 		is_local: false,
 	};
@@ -269,6 +288,40 @@ describe("scan", () => {
 
 		// Only "Cloud Song" should be scanned, local track is skipped
 		expect(doneEvent?.type === "done" && doneEvent.summary.totalScanned).toBe(1);
+	});
+
+	it("includes smallest album image as thumbnailUrl on unplayable tracks", async () => {
+		mockedGet.mockImplementation((path: string) => {
+			if (path === "/me") return Promise.resolve(user);
+			if (path.startsWith("/me/playlists")) return Promise.resolve(makePage([]));
+			if (path.startsWith("/me/tracks"))
+				return Promise.resolve(makePage([makeSavedTrack("Dead Song", false)]));
+			return Promise.resolve(makePage([]));
+		});
+
+		const events = await collectEvents(scan());
+		const foundEvent = events.find((e) => e.type === "found");
+
+		expect(foundEvent?.type === "found" && foundEvent.track.thumbnailUrl).toBe(
+			"https://img/small.jpg",
+		);
+	});
+
+	it("omits thumbnailUrl when track has no album images", async () => {
+		mockedGet.mockImplementation((path: string) => {
+			if (path === "/me") return Promise.resolve(user);
+			if (path.startsWith("/me/playlists")) return Promise.resolve(makePage([]));
+			if (path.startsWith("/me/tracks"))
+				return Promise.resolve(
+					makePage([{ track: makeTrackNoArt("No Art", false) } as SpotifySavedTrack]),
+				);
+			return Promise.resolve(makePage([]));
+		});
+
+		const events = await collectEvents(scan());
+		const foundEvent = events.find((e) => e.type === "found");
+
+		expect(foundEvent?.type === "found" && foundEvent.track.thumbnailUrl).toBeUndefined();
 	});
 
 	it("prefetches playlists before emitting any progress events", async () => {

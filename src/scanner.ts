@@ -61,6 +61,8 @@ async function* scanSource<T extends SpotifySavedTrack | SpotifyPlaylistTrack>(
 			scanned++;
 
 			if (isUnplayable(track)) {
+				const images = track.album.images;
+				const thumbnail = images.length > 0 ? images[images.length - 1] : undefined;
 				yield {
 					type: "found",
 					track: {
@@ -68,6 +70,7 @@ async function* scanSource<T extends SpotifySavedTrack | SpotifyPlaylistTrack>(
 						artists: track.artists.map((a) => a.name),
 						source: sourceName,
 						reason: getRestrictionReason(track),
+						thumbnailUrl: thumbnail?.url,
 					},
 				};
 			}

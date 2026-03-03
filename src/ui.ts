@@ -224,21 +224,41 @@ export function renderResults(summary: ScanSummary, onScanAgain: () => void): vo
 	app.appendChild(container);
 }
 
+function renderPlaceholder(): HTMLDivElement {
+	return h("div", {
+		class: "w-10 h-10 rounded bg-gray-800 shrink-0",
+	});
+}
+
+function renderThumbnail(track: UnplayableTrack): HTMLElement {
+	if (!track.thumbnailUrl) return renderPlaceholder();
+
+	const img = h("img", {
+		src: track.thumbnailUrl,
+		alt: "",
+		class: "w-10 h-10 rounded object-cover shrink-0",
+	});
+	img.onerror = () => {
+		img.replaceWith(renderPlaceholder());
+	};
+	return img;
+}
+
 function renderTrackList(tracks: UnplayableTrack[]): HTMLDivElement {
 	const rows = tracks.map((track) =>
 		h(
 			"div",
 			{
-				class:
-					"flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 py-3 border-b border-gray-800",
+				class: "flex items-center gap-3 sm:gap-4 py-3 border-b border-gray-800",
 			},
+			renderThumbnail(track),
 			h(
 				"div",
 				{ class: "flex-1 min-w-0" },
 				h("p", { class: "text-white font-medium truncate" }, track.name),
 				h("p", { class: "text-gray-400 text-sm truncate" }, track.artists.join(", ")),
 			),
-			h("span", { class: "text-gray-500 text-sm shrink-0" }, track.source),
+			h("span", { class: "text-gray-500 text-sm shrink-0 hidden sm:inline" }, track.source),
 			h("span", { class: "text-red-400 text-sm shrink-0" }, track.reason),
 		),
 	);

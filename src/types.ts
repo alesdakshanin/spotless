@@ -15,6 +15,7 @@ export interface SpotifyTrack {
 	id: string;
 	name: string;
 	artists: SpotifyArtist[];
+	album: { name: string; images: SpotifyImage[] };
 	is_playable?: boolean;
 	is_local?: boolean;
 	restrictions?: { reason: string };
@@ -57,6 +58,7 @@ export interface UnplayableTrack {
 	artists: string[];
 	source: string;
 	reason: string;
+	thumbnailUrl?: string;
 }
 
 export type ScanEvent =
