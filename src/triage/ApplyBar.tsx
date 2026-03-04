@@ -20,7 +20,7 @@ export function ApplyBar({
 	const summary = parts.join(" + ");
 
 	return (
-		<div class="fixed bottom-0 left-0 right-0 bg-app-surface/95 backdrop-blur border-t border-white/[0.08] py-3 px-6 flex items-center justify-between z-50 animate-slide-up">
+		<div class="bg-app-surface/95 backdrop-blur border-t border-white/[0.08] py-3 px-6 flex items-center justify-between animate-slide-up">
 			<span class="text-app-text text-[13px]">{summary}</span>
 			<button
 				type="button"

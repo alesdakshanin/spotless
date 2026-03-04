@@ -1,5 +1,6 @@
 // src/triage/TrackExpansion.tsx — Accordion expansion panel with candidate selection
 
+import { play, playingUri, sdkReady } from "../audio";
 import type { ReplacementCandidate } from "../types";
 import type { TriageStore, TriageTrack } from "./state";
 import { selectCandidate, toggleRemoveOriginal } from "./state";
@@ -16,6 +17,8 @@ function CandidateRow({
 	const stars = "★".repeat(candidate.confidence) + "☆".repeat(3 - candidate.confidence);
 	const images = candidate.track.album.images;
 	const thumbnail = images.length > 0 ? images[images.length - 1] : undefined;
+	const trackUri = candidate.track.uri;
+	const isPlaying = playingUri.value === trackUri;
 
 	return (
 		<label
@@ -44,6 +47,37 @@ function CandidateRow({
 				<img src={thumbnail.url} alt="" class="w-9 h-9 rounded-[2px] object-cover shrink-0" />
 			) : (
 				<div class="w-9 h-9 rounded-[2px] bg-app-surface shrink-0" />
+			)}
+
+			{/* Play / Open in Spotify */}
+			{sdkReady.value ? (
+				<button
+					type="button"
+					title="Play on Spotify"
+					class={`w-8 h-8 flex items-center justify-center rounded-full shrink-0 cursor-pointer transition-colors ${
+						isPlaying
+							? "bg-accent/20 text-accent"
+							: "bg-white/[0.06] text-app-muted hover:bg-white/10 hover:text-app-text"
+					}`}
+					onClick={(e) => {
+						e.stopPropagation();
+						e.preventDefault();
+						play(trackUri);
+					}}
+				>
+					<span class="text-[11px]">{isPlaying ? "⏸" : "▶"}</span>
+				</button>
+			) : (
+				<a
+					href={`https://open.spotify.com/track/${candidate.track.id}`}
+					target="_blank"
+					rel="noopener noreferrer"
+					title="Open in Spotify"
+					class="w-8 h-8 flex items-center justify-center rounded-full bg-white/[0.06] text-app-muted hover:bg-white/10 hover:text-app-text shrink-0"
+					onClick={(e) => e.stopPropagation()}
+				>
+					<span class="text-[11px]">↗</span>
+				</a>
 			)}
 
 			{/* Info */}

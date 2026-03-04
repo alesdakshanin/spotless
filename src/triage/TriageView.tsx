@@ -5,6 +5,7 @@ import type { ScanSummary } from "../types";
 import { ApplyBar } from "./ApplyBar";
 import type { BatchResult } from "./batch";
 import { FilterBar } from "./FilterBar";
+import { MiniPlayer } from "./MiniPlayer";
 import { ReviewModal } from "./ReviewModal";
 import type { TriageStore, TriageTrack } from "./state";
 import { markTracksApplied } from "./state";
@@ -57,7 +58,7 @@ export function TriageView({
 	};
 
 	return (
-		<div class="min-h-screen flex flex-col items-center bg-app-gradient text-app-text px-4 py-12 pb-24">
+		<div class="min-h-screen flex flex-col items-center bg-app-gradient text-app-text px-4 py-12 pb-36">
 			<h1 class="text-[34px] font-bold tracking-[-2px] mb-6 text-app-muted">Spotless</h1>
 			<h2 class="text-2xl font-bold mb-2 text-app-text">Scan Results</h2>
 			<p class="text-app-muted text-[13px] mb-6">
@@ -113,13 +114,16 @@ export function TriageView({
 				</button>
 			</div>
 
-			{/* Apply bar */}
-			<ApplyBar
-				pendingOps={pendingOps}
-				onApply={() => {
-					showModal.value = true;
-				}}
-			/>
+			{/* Bottom bars: mini player + apply */}
+			<div class="fixed bottom-0 left-0 right-0 z-50 flex flex-col">
+				<MiniPlayer />
+				<ApplyBar
+					pendingOps={pendingOps}
+					onApply={() => {
+						showModal.value = true;
+					}}
+				/>
+			</div>
 
 			{/* Review modal */}
 			{showModal.value && (

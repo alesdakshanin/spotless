@@ -45,7 +45,15 @@ export async function searchReplacements(track: UnplayableTrack): Promise<Replac
 	console.log(`[replacements] Searching: ${decodeURIComponent(query)} → ${url}`);
 
 	const response = await get<SpotifySearchResponse>(url);
-	console.log(`[replacements] Results for "${track.name}":`, response.tracks.items.length, "items", response.tracks.items.map(i => `${i.name} by ${i.artists.map(a => a.name).join(", ")} [playable=${i.is_playable}, uri=${i.uri}]`));
+	console.log(
+		`[replacements] Results for "${track.name}":`,
+		response.tracks.items.length,
+		"items",
+		response.tracks.items.map(
+			(i) =>
+				`${i.name} by ${i.artists.map((a) => a.name).join(", ")} [playable=${i.is_playable}, uri=${i.uri}]`,
+		),
+	);
 
 	const candidates: ReplacementCandidate[] = [];
 
