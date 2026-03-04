@@ -41,6 +41,7 @@ export function isLocalTrack(item: SpotifySavedTrack | SpotifyPlaylistTrack): bo
 async function* scanSource<T extends SpotifySavedTrack | SpotifyPlaylistTrack>(
 	path: string,
 	sourceName: string,
+	sourceId: string | null,
 ): AsyncGenerator<ScanEvent> {
 	let offset = 0;
 	let total = 0;
@@ -69,6 +70,8 @@ async function* scanSource<T extends SpotifySavedTrack | SpotifyPlaylistTrack>(
 						name: track.name,
 						artists: track.artists.map((a) => a.name),
 						source: sourceName,
+						sourceId,
+						trackUri: track.uri,
 						reason: getRestrictionReason(track),
 						thumbnailUrl: thumbnail?.url,
 					},
@@ -120,7 +123,7 @@ export async function* scan(): AsyncGenerator<ScanEvent> {
 
 	// Scan Liked Songs
 	let likedSongsScanned = 0;
-	for await (const event of scanSource<SpotifySavedTrack>("/me/tracks", "Liked Songs")) {
+	for await (const event of scanSource<SpotifySavedTrack>("/me/tracks", "Liked Songs", null)) {
 		if (event.type === "found") {
 			unplayable.push(event.track);
 		}
@@ -138,6 +141,7 @@ export async function* scan(): AsyncGenerator<ScanEvent> {
 		for await (const event of scanSource<SpotifyPlaylistTrack>(
 			`/playlists/${playlist.id}/tracks`,
 			playlist.name,
+			playlist.id,
 		)) {
 			if (event.type === "found") {
 				unplayable.push(event.track);

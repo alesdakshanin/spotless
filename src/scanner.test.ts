@@ -21,6 +21,7 @@ const mockedGet = vi.mocked(get);
 function makeTrack(name: string, playable = true) {
 	return {
 		id: name,
+		uri: `spotify:track:${name}`,
 		name,
 		artists: [{ id: "a1", name: "Artist" }],
 		album: {
@@ -39,6 +40,7 @@ function makeTrack(name: string, playable = true) {
 function makeTrackNoArt(name: string, playable = true) {
 	return {
 		id: name,
+		uri: `spotify:track:${name}`,
 		name,
 		artists: [{ id: "a1", name: "Artist" }],
 		album: { name: `${name} Album`, images: [] },

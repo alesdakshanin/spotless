@@ -13,12 +13,14 @@ export interface SpotifyArtist {
 
 export interface SpotifyTrack {
 	id: string;
+	uri: string;
 	name: string;
 	artists: SpotifyArtist[];
 	album: { name: string; images: SpotifyImage[] };
 	is_playable?: boolean;
 	is_local?: boolean;
 	restrictions?: { reason: string };
+	preview_url?: string | null;
 }
 
 export interface SpotifySavedTrack {
@@ -57,8 +59,17 @@ export interface UnplayableTrack {
 	name: string;
 	artists: string[];
 	source: string;
+	sourceId: string | null;
+	trackUri: string;
 	reason: string;
 	thumbnailUrl?: string;
+}
+
+export interface ReplacementCandidate {
+	track: SpotifyTrack;
+	confidence: 1 | 2 | 3;
+	thumbnailUrl?: string;
+	previewUrl?: string;
 }
 
 export type ScanEvent =
