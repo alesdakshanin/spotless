@@ -25,9 +25,13 @@ vi.mock("../src/ui", () => ({
 	renderSourceList: vi.fn(),
 	updateSourceProgress: vi.fn(),
 	markSourceComplete: vi.fn(),
-	renderResults: vi.fn(),
 	renderSpotless: vi.fn(),
 	renderError: vi.fn(),
+}));
+
+vi.mock("../src/triage/mount", () => ({
+	mountTriageView: vi.fn(),
+	unmountTriageView: vi.fn(),
 }));
 
 // --- Import mocked modules for assertions ---
@@ -35,12 +39,12 @@ vi.mock("../src/ui", () => ({
 import { get } from "../src/api";
 import { clearTokens, handleCallback, loadTokens, saveTokens } from "../src/auth";
 import { scan } from "../src/scanner";
+import { mountTriageView } from "../src/triage/mount";
 import {
 	markSourceComplete,
 	renderError,
 	renderLogin,
 	renderProgressScreen,
-	renderResults,
 	renderScanScreen,
 	renderSourceList,
 	renderSpotless,
@@ -204,10 +208,17 @@ describe("startScan()", () => {
 		vi.resetModules();
 		setLocationSearch("");
 		vi.spyOn(window.history, "replaceState").mockImplementation(() => {});
+		// Ensure #app exists for mount/unmount
+		if (!document.querySelector("#app")) {
+			const app = document.createElement("div");
+			app.id = "app";
+			document.body.appendChild(app);
+		}
 	});
 
 	afterEach(() => {
 		vi.restoreAllMocks();
+		document.querySelector("#app")?.remove();
 	});
 
 	/** Import main, wait for init, then capture and return the onScan callback */
@@ -233,7 +244,7 @@ describe("startScan()", () => {
 		vi.mocked(renderSourceList).mockClear();
 		vi.mocked(updateSourceProgress).mockClear();
 		vi.mocked(markSourceComplete).mockClear();
-		vi.mocked(renderResults).mockClear();
+		vi.mocked(mountTriageView).mockClear();
 		vi.mocked(renderSpotless).mockClear();
 		vi.mocked(renderError).mockClear();
 
@@ -334,7 +345,7 @@ describe("startScan()", () => {
 		expect(renderSpotless).toHaveBeenCalledWith(10, expect.any(Function));
 	});
 
-	it("renders results for unplayable tracks", async () => {
+	it("mounts triage view for unplayable tracks", async () => {
 		const onScan = await getStartScan();
 		const summary = {
 			totalScanned: 10,
@@ -349,7 +360,11 @@ describe("startScan()", () => {
 
 		await onScan();
 
-		expect(renderResults).toHaveBeenCalledWith(summary, expect.any(Function));
+		expect(mountTriageView).toHaveBeenCalledWith(
+			expect.any(HTMLElement),
+			summary,
+			expect.any(Function),
+		);
 	});
 
 	it("renders error when scan throws", async () => {

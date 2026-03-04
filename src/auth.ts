@@ -3,7 +3,7 @@
 const AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
 const TOKEN_URL = "https://accounts.spotify.com/api/token";
 const SCOPES =
-	"user-library-read playlist-read-private user-library-modify playlist-modify-public playlist-modify-private";
+	"user-read-private user-library-read playlist-read-private user-library-modify playlist-modify-public playlist-modify-private";
 
 function getClientId(): string {
 	const id = import.meta.env.VITE_SPOTIFY_CLIENT_ID;

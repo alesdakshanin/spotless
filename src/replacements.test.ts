@@ -132,6 +132,15 @@ describe("scoreConfidence", () => {
 });
 
 describe("searchReplacements", () => {
+	it("passes market=from_token in the search query", async () => {
+		const track = makeUnplayable();
+		mockedGet.mockResolvedValueOnce({ tracks: { items: [] } });
+
+		await searchReplacements(track);
+
+		expect(mockedGet).toHaveBeenCalledWith(expect.stringContaining("market=from_token"));
+	});
+
 	it("returns up to 3 candidates sorted by confidence", async () => {
 		const track = makeUnplayable();
 		mockedGet.mockResolvedValueOnce({

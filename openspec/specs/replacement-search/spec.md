@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Search for replacement candidates
-The system SHALL search the Spotify API for replacement candidates when a user expands an unplayable track row. The search query SHALL use Spotify's field-filtered format: `track:"<normalized name>" artist:"<first artist>"` with `type=track` and `limit=3`. The track name SHALL be normalized by stripping parenthetical suffixes (text in parentheses or after " - " dashes, such as "Remaster", "Deluxe Edition", "feat. X"). The system SHALL filter out any result whose track URI matches the original unplayable track's URI.
+The system SHALL search the Spotify API for replacement candidates when a user expands an unplayable track row. The search query SHALL use Spotify's field-filtered format: `track:"<normalized name>" artist:"<first artist>"` with `type=track`, `limit=3`, and `market=from_token` (to ensure `is_playable` is populated for the user's region). The track name SHALL be normalized by stripping parenthetical suffixes (text in parentheses or after " - " dashes, such as "Remaster", "Deluxe Edition", "feat. X"). The system SHALL filter out any result whose track URI matches the original unplayable track's URI.
 
 #### Scenario: Search for a remastered track
 - **WHEN** the user expands a row for "Bohemian Rhapsody (2011 Remaster)" by "Queen"

@@ -1,7 +1,7 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.4.5/schema.json",
 	"files": {
-		"includes": ["**", "!.claude", "!coverage"]
+		"includes": ["**", "!.claude", "!coverage", "!dist"]
 	},
 	"formatter": {
 		"indentStyle": "tab",
@@ -10,6 +10,11 @@
 	"linter": {
 		"rules": {
 			"recommended": true
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
 		}
 	}
 }

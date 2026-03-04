@@ -3,18 +3,33 @@
 import { get } from "./api";
 import { clearTokens, handleCallback, loadTokens, login, saveTokens } from "./auth";
 import { scan } from "./scanner";
-import type { SpotifyUser } from "./types";
+import { mountTriageView, unmountTriageView } from "./triage/mount";
+import type { ScanSummary, SpotifyUser } from "./types";
 import {
 	markSourceComplete,
 	renderError,
 	renderLogin,
 	renderProgressScreen,
-	renderResults,
 	renderScanScreen,
 	renderSourceList,
 	renderSpotless,
 	updateSourceProgress,
 } from "./ui";
+
+function getApp(): HTMLDivElement {
+	const app = document.querySelector<HTMLDivElement>("#app");
+	if (!app) throw new Error("Missing #app element");
+	return app;
+}
+
+function showTriageView(summary: ScanSummary): void {
+	const app = getApp();
+	app.innerHTML = "";
+	mountTriageView(app, summary, () => {
+		unmountTriageView(app);
+		startScan();
+	});
+}
 
 async function showScanScreen(): Promise<void> {
 	const user = await get<SpotifyUser>("/me");
@@ -24,6 +39,8 @@ async function showScanScreen(): Promise<void> {
 }
 
 async function startScan(): Promise<void> {
+	const app = getApp();
+	unmountTriageView(app);
 	renderProgressScreen();
 	let unplayableCount = 0;
 	let lastSource = "";
@@ -53,7 +70,7 @@ async function startScan(): Promise<void> {
 				if (event.summary.unplayable.length === 0) {
 					renderSpotless(event.summary.totalScanned, startScan);
 				} else {
-					renderResults(event.summary, startScan);
+					showTriageView(event.summary);
 				}
 			}
 		}

@@ -5,7 +5,7 @@ The system SHALL authenticate users via Spotify's Authorization Code with PKCE f
 
 #### Scenario: Successful login
 - **WHEN** user clicks "Log in with Spotify"
-- **THEN** the system redirects to Spotify's authorization page with PKCE parameters and requested scopes `user-library-read` and `playlist-read-private`
+- **THEN** the system redirects to Spotify's authorization page with PKCE parameters and requested scopes `user-library-read`, `playlist-read-private`, `user-library-modify`, `playlist-modify-public`, and `playlist-modify-private`
 
 #### Scenario: Successful callback
 - **WHEN** Spotify redirects back with an authorization code

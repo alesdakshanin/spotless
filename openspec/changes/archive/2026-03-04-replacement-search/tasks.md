@@ -44,4 +44,4 @@
 ## 7. Integration & Polish
 
 - [x] 7.1 Run `npm run check` — fix any type errors, lint issues, or test failures
-- [ ] 7.2 Manual testing: end-to-end flow with real Spotify account — expand, preview, add, remove
+- [x] 7.2 Manual testing: end-to-end flow with real Spotify account — expand, preview, add, remove
