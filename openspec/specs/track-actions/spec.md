@@ -1,4 +1,4 @@
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Add track to Liked Songs
 The system SHALL add a candidate track to the user's Liked Songs library via `PUT /me/tracks` when the user clicks "Add" on a candidate whose original source is Liked Songs.
@@ -36,17 +36,13 @@ The system SHALL remove an unplayable track from a playlist via `DELETE /playlis
 - **WHEN** user clicks "Remove original" on a track sourced from playlist "Road Trip" (ID: abc123)
 - **THEN** the system calls `DELETE /playlists/abc123/tracks` with the track's URI and the button transitions to "✓ Removed"
 
-### Requirement: Independent action state
-The "Add" and "Remove" actions SHALL operate independently. Performing one SHALL NOT require or trigger the other. Each button SHALL track its own state: default, loading, or completed.
+### Requirement: Coupled action state
+The "Add" and "Remove" actions for a given track SHALL be coupled through the batch execution model. For each track in the batch, the ADD operation SHALL execute before the REMOVE operation. If the ADD fails, the REMOVE for that track SHALL be skipped. Actions are no longer triggered independently by individual button clicks — they are staged via triage state and committed together in a batch.
 
-#### Scenario: Add without removing
-- **WHEN** user adds a replacement but does not click "Remove original"
-- **THEN** the replacement is added and the remove button remains available
+#### Scenario: Batch replaces independent actions
+- **WHEN** user confirms batch apply with 3 tracks staged
+- **THEN** each track's add and remove operations execute sequentially as a pair, not as independent user-triggered actions
 
-#### Scenario: Remove without adding
-- **WHEN** user clicks "Remove original" without adding any candidate
-- **THEN** the original track is removed and no replacement is added
-
-#### Scenario: Both actions performed
-- **WHEN** user adds a replacement and removes the original
-- **THEN** both buttons show their completed state ("✓ Added" and "✓ Removed")
+#### Scenario: Add failure skips remove
+- **WHEN** the add operation for a track fails during batch apply
+- **THEN** the remove operation for that track is skipped to preserve the original
