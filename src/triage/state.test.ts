@@ -38,7 +38,7 @@ function makeCandidate(
 			uri,
 			name,
 			artists: [{ id: "a1", name: "Artist B" }],
-			album: { name: "Album", images: [] },
+			album: { id: "alb1", name: "Album", images: [] },
 		},
 		confidence,
 	};

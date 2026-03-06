@@ -90,7 +90,7 @@ describe("audio", () => {
 		nowPlaying.value = {
 			uri: "spotify:track:abc123",
 			name: "Test",
-			artists: "Artist",
+			artists: [{ name: "Artist", uri: "spotify:artist:a1" }],
 			paused: false,
 		};
 
@@ -106,7 +106,7 @@ describe("audio", () => {
 		nowPlaying.value = {
 			uri: "spotify:track:abc123",
 			name: "Test",
-			artists: "Artist",
+			artists: [{ name: "Artist", uri: "spotify:artist:a1" }],
 			paused: false,
 		};
 		sdkReady.value = true;

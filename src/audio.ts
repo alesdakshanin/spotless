@@ -8,7 +8,8 @@ import { isTokenExpired, loadTokens, refreshAccessToken } from "./auth";
 export interface NowPlayingTrack {
 	uri: string;
 	name: string;
-	artists: string;
+	artists: Array<{ name: string; uri: string }>;
+	albumUri?: string;
 	albumArtUrl?: string;
 	paused: boolean;
 }
@@ -84,14 +85,25 @@ export async function initPlayer(): Promise<void> {
 		const images = track.album.images;
 		const art = images.length > 0 ? images[0] : undefined;
 
-		playingUri.value = state.paused ? null : track.uri;
-		nowPlaying.value = {
-			uri: track.uri,
-			name: track.name,
-			artists: track.artists.map((a) => a.name).join(", "),
-			albumArtUrl: art?.url,
-			paused: state.paused,
-		};
+		const newUri = state.paused ? null : track.uri;
+		if (playingUri.value !== newUri) playingUri.value = newUri;
+
+		const prev = nowPlaying.value;
+		if (
+			!prev ||
+			prev.uri !== track.uri ||
+			prev.paused !== state.paused ||
+			prev.albumArtUrl !== art?.url
+		) {
+			nowPlaying.value = {
+				uri: track.uri,
+				name: track.name,
+				artists: track.artists,
+				albumUri: track.album.uri,
+				albumArtUrl: art?.url,
+				paused: state.paused,
+			};
+		}
 	});
 
 	player = p;

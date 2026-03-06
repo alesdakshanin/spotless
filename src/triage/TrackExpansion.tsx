@@ -1,6 +1,7 @@
 // src/triage/TrackExpansion.tsx — Accordion expansion panel with candidate selection
 
 import { play, playingUri, sdkReady } from "../audio";
+import { spotifyUrl } from "../spotify-url";
 import type { ReplacementCandidate } from "../types";
 import type { TriageStore, TriageTrack } from "./state";
 import { selectCandidate, toggleRemoveOriginal } from "./state";
@@ -44,7 +45,15 @@ function CandidateRow({
 
 			{/* Thumbnail */}
 			{thumbnail?.url ? (
-				<img src={thumbnail.url} alt="" class="w-9 h-9 rounded-[2px] object-cover shrink-0" />
+				<a
+					href={spotifyUrl("album", candidate.track.album.id)}
+					target="_blank"
+					rel="noopener noreferrer"
+					class="shrink-0"
+					onClick={(e) => e.stopPropagation()}
+				>
+					<img src={thumbnail.url} alt="" class="w-9 h-9 rounded-[2px] object-cover" />
+				</a>
 			) : (
 				<div class="w-9 h-9 rounded-[2px] bg-app-surface shrink-0" />
 			)}
@@ -82,9 +91,33 @@ function CandidateRow({
 
 			{/* Info */}
 			<div class="flex-1 min-w-0">
-				<p class="text-app-text text-[12px] truncate">{candidate.track.name}</p>
+				<p class="text-app-text text-[12px] truncate">
+					<a
+						href={spotifyUrl("track", candidate.track.id)}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="hover:underline"
+						onClick={(e) => e.stopPropagation()}
+					>
+						{candidate.track.name}
+					</a>
+				</p>
 				<p class="text-app-muted text-[11px] truncate">
-					{candidate.track.artists.map((a) => a.name).join(", ")}
+					{candidate.track.artists.map((a, i) => (
+						<>
+							{i > 0 && ", "}
+							<a
+								key={a.id}
+								href={spotifyUrl("artist", a.id)}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="hover:underline"
+								onClick={(e) => e.stopPropagation()}
+							>
+								{a.name}
+							</a>
+						</>
+					))}
 				</p>
 			</div>
 

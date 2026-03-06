@@ -29,6 +29,7 @@ function makeSpotifyTrack(overrides: Partial<SpotifyTrack> = {}): SpotifyTrack {
 		name: "Song Title",
 		artists: [{ id: "a1", name: "Artist Name" }],
 		album: {
+			id: "alb1",
 			name: "Album",
 			images: [{ url: "https://img/small.jpg", height: 64, width: 64 }],
 		},
@@ -218,6 +219,7 @@ describe("searchReplacements", () => {
 						uri: "spotify:track:c1",
 						preview_url: "https://preview.mp3",
 						album: {
+							id: "alb1",
 							name: "Album",
 							images: [{ url: "https://img/thumb.jpg", height: 64, width: 64 }],
 						},

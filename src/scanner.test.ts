@@ -25,6 +25,7 @@ function makeTrack(name: string, playable = true) {
 		name,
 		artists: [{ id: "a1", name: "Artist" }],
 		album: {
+			id: `${name}-alb`,
 			name: `${name} Album`,
 			images: [
 				{ url: "https://img/large.jpg", height: 640, width: 640 },
@@ -43,7 +44,7 @@ function makeTrackNoArt(name: string, playable = true) {
 		uri: `spotify:track:${name}`,
 		name,
 		artists: [{ id: "a1", name: "Artist" }],
-		album: { name: `${name} Album`, images: [] },
+		album: { id: `${name}-alb`, name: `${name} Album`, images: [] },
 		is_playable: playable,
 		is_local: false,
 	};

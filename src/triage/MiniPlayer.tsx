@@ -1,6 +1,7 @@
 // src/triage/MiniPlayer.tsx — Persistent mini player bar showing current playback
 
 import { dismiss, nowPlaying, togglePlay } from "../audio";
+import { spotifyUrlFromUri } from "../spotify-url";
 
 export function MiniPlayer() {
 	const state = nowPlaying.value;
@@ -10,15 +11,57 @@ export function MiniPlayer() {
 		<div class="bg-app-surface/95 backdrop-blur border-t border-white/[0.08] py-2 px-4 flex items-center gap-3 animate-slide-up">
 			{/* Album art */}
 			{state.albumArtUrl ? (
-				<img src={state.albumArtUrl} alt="" class="w-10 h-10 rounded object-cover shrink-0" />
+				(() => {
+					const albumUrl = state.albumUri ? spotifyUrlFromUri(state.albumUri) : undefined;
+					const img = <img src={state.albumArtUrl} alt="" class="w-10 h-10 rounded object-cover" />;
+					return albumUrl ? (
+						<a href={albumUrl} target="_blank" rel="noopener noreferrer" class="shrink-0">
+							{img}
+						</a>
+					) : (
+						<span class="shrink-0">{img}</span>
+					);
+				})()
 			) : (
 				<div class="w-10 h-10 rounded bg-white/[0.06] shrink-0" />
 			)}
 
 			{/* Track info */}
 			<div class="flex-1 min-w-0">
-				<p class="text-app-text text-[12px] truncate">{state.name}</p>
-				<p class="text-app-muted text-[11px] truncate">{state.artists}</p>
+				<p class="text-app-text text-[12px] truncate">
+					{(() => {
+						const trackUrl = spotifyUrlFromUri(state.uri);
+						return trackUrl ? (
+							<a href={trackUrl} target="_blank" rel="noopener noreferrer" class="hover:underline">
+								{state.name}
+							</a>
+						) : (
+							state.name
+						);
+					})()}
+				</p>
+				<p class="text-app-muted text-[11px] truncate">
+					{state.artists.map((a, i) => {
+						const artistUrl = spotifyUrlFromUri(a.uri);
+						return (
+							<>
+								{i > 0 && ", "}
+								{artistUrl ? (
+									<a
+										href={artistUrl}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="hover:underline"
+									>
+										{a.name}
+									</a>
+								) : (
+									a.name
+								)}
+							</>
+						);
+					})}
+				</p>
 			</div>
 
 			{/* Play/Pause */}

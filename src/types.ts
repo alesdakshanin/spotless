@@ -16,7 +16,7 @@ export interface SpotifyTrack {
 	uri: string;
 	name: string;
 	artists: SpotifyArtist[];
-	album: { name: string; images: SpotifyImage[] };
+	album: { id: string; name: string; images: SpotifyImage[] };
 	is_playable?: boolean;
 	is_local?: boolean;
 	restrictions?: { reason: string };
