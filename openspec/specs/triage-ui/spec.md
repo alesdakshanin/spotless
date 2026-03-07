@@ -111,15 +111,15 @@ While the background replacement search is running, the system SHALL display a p
 - **THEN** the track row shows a subtle shimmer/loading state on the confidence indicator and candidate preview area
 
 ### Requirement: Apply bar
-A fixed bottom bar SHALL appear (slide up) whenever at least one track is checked with a selected candidate. The bar SHALL display a summary ("N replacements + N removals") and an "Apply Changes" primary action button. The bar SHALL disappear (slide down) when no changes are pending.
+A fixed bottom bar SHALL appear (slide up) whenever at least one track is checked with a selected candidate. The bar SHALL display a summary using track-level intent labels — "N swaps" (replacement selected + remove original), "N additions" (replacement selected, keep original), "N removals" (remove only, no replacement) — joined with " + ". An "Apply Changes" primary action button appears alongside. The bar SHALL disappear (slide down) when no changes are pending.
 
 #### Scenario: Apply bar appears
 - **WHEN** user checks a track with a selected candidate
-- **THEN** a fixed bottom bar slides up showing "1 replacement + 1 removal" and an "Apply Changes" button
+- **THEN** a fixed bottom bar slides up showing "1 swap" and an "Apply Changes" button
 
 #### Scenario: Apply bar updates counts
 - **WHEN** 3 tracks are checked with candidates and remove-original enabled on all
-- **THEN** the apply bar shows "3 replacements + 3 removals"
+- **THEN** the apply bar shows "3 swaps"
 
 #### Scenario: Apply bar disappears
 - **WHEN** user unchecks all tracks
@@ -129,8 +129,8 @@ A fixed bottom bar SHALL appear (slide up) whenever at least one track is checke
 Clicking "Apply Changes" SHALL open a modal overlay titled "Review Changes" with a subtitle showing operation counts and a warning that changes will modify the Spotify library. The modal SHALL contain a scrollable list of all pending operations, each showing: action type badge (ADD / REMOVE), track or candidate name, target source, and confidence stars. Footer SHALL contain "Cancel" (closes modal) and "Apply N changes" (triggers batch execution).
 
 #### Scenario: Review modal content
-- **WHEN** user clicks "Apply Changes" with 3 replacements and 3 removals staged
-- **THEN** a modal shows "Review Changes", lists 6 operations with badges and details, and has Cancel + "Apply 6 changes" buttons
+- **WHEN** user clicks "Apply Changes" with 3 swaps staged
+- **THEN** a modal shows "Review Changes" with subtitle "3 swaps", lists 6 operations (3 ADD + 3 REMOVE) with badges and details, and has Cancel + "Apply 6 changes" buttons
 
 #### Scenario: Cancel review
 - **WHEN** user clicks "Cancel" in the review modal

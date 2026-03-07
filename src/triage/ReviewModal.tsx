@@ -3,6 +3,7 @@
 import { useSignal } from "@preact/signals";
 import { type BatchResult, executeBatch } from "./batch";
 import type { PendingOp } from "./state";
+import { summarizeOps } from "./summarizeOps";
 
 type ModalState =
 	| { phase: "review" }
@@ -50,8 +51,7 @@ export function ReviewModal({
 		onComplete({ succeeded: allSucceeded, failed: result.failed });
 	};
 
-	const addCount = pendingOps.filter((op) => op.type === "add").length;
-	const removeCount = pendingOps.filter((op) => op.type === "remove").length;
+	const summary = summarizeOps(pendingOps);
 
 	return (
 		<div
@@ -69,8 +69,7 @@ export function ReviewModal({
 				{state.value.phase === "review" && (
 					<ReviewContent
 						pendingOps={pendingOps}
-						addCount={addCount}
-						removeCount={removeCount}
+						summary={summary}
 						onCancel={onClose}
 						onApply={handleApply}
 					/>
@@ -90,27 +89,21 @@ export function ReviewModal({
 
 function ReviewContent({
 	pendingOps,
-	addCount,
-	removeCount,
+	summary,
 	onCancel,
 	onApply,
 }: {
 	pendingOps: PendingOp[];
-	addCount: number;
-	removeCount: number;
+	summary: string;
 	onCancel: () => void;
 	onApply: () => void;
 }) {
-	const parts: string[] = [];
-	if (addCount > 0) parts.push(`${addCount} replacement${addCount !== 1 ? "s" : ""}`);
-	if (removeCount > 0) parts.push(`${removeCount} removal${removeCount !== 1 ? "s" : ""}`);
-
 	return (
 		<>
 			<div class="p-5 border-b border-white/[0.08]">
 				<h2 class="text-app-text text-lg font-bold">Review Changes</h2>
 				<p class="text-app-muted text-[12px] mt-1">
-					{parts.join(" + ")} — these changes will modify your Spotify library.
+					{summary} — these changes will modify your Spotify library.
 				</p>
 			</div>
 

@@ -1,6 +1,7 @@
 // src/triage/ApplyBar.tsx — Fixed bottom bar with apply action
 
 import type { PendingOp } from "./state";
+import { summarizeOps } from "./summarizeOps";
 
 export function ApplyBar({
 	pendingOps,
@@ -11,13 +12,7 @@ export function ApplyBar({
 }) {
 	if (pendingOps.length === 0) return null;
 
-	const addCount = pendingOps.filter((op) => op.type === "add").length;
-	const removeCount = pendingOps.filter((op) => op.type === "remove").length;
-
-	const parts: string[] = [];
-	if (addCount > 0) parts.push(`${addCount} replacement${addCount !== 1 ? "s" : ""}`);
-	if (removeCount > 0) parts.push(`${removeCount} removal${removeCount !== 1 ? "s" : ""}`);
-	const summary = parts.join(" + ");
+	const summary = summarizeOps(pendingOps);
 
 	return (
 		<div class="bg-app-surface/95 backdrop-blur border-t border-white/[0.08] py-3 px-6 flex items-center justify-between animate-slide-up">
