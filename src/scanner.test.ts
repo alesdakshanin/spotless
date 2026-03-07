@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
+	ScanConfig,
 	ScanEvent,
 	SpotifyPaginatedResponse,
 	SpotifyPlaylist,
 	SpotifyPlaylistTrack,
 	SpotifySavedTrack,
-	SpotifyUser,
 } from "./types";
 
 // Mock the api module before importing scanner
@@ -68,11 +68,13 @@ function makePage<T>(items: T[], total?: number): SpotifyPaginatedResponse<T> {
 	};
 }
 
-function makePlaylist(id: string, name: string, ownerId: string): SpotifyPlaylist {
-	return { id, name, owner: { id: ownerId }, tracks: { total: 1 } };
+function makePlaylist(id: string, name: string): SpotifyPlaylist {
+	return { id, name, owner: { id: "user1" }, tracks: { total: 1 }, images: [] };
 }
 
-const user: SpotifyUser = { id: "user1", display_name: "Test User", images: [] };
+function allSources(...playlists: SpotifyPlaylist[]): ScanConfig {
+	return { includeLikedSongs: true, playlists };
+}
 
 async function collectEvents(gen: AsyncGenerator<ScanEvent>): Promise<ScanEvent[]> {
 	const events: ScanEvent[] = [];
@@ -83,17 +85,11 @@ async function collectEvents(gen: AsyncGenerator<ScanEvent>): Promise<ScanEvent[
 }
 
 describe("scan", () => {
-	it("emits sources event with Liked Songs and owned playlist names before scanning", async () => {
+	it("emits sources event with Liked Songs and playlist names", async () => {
+		const p1 = makePlaylist("p1", "Road Trip");
+		const p2 = makePlaylist("p2", "Chill Vibes");
+
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists"))
-				return Promise.resolve(
-					makePage([
-						makePlaylist("p1", "Road Trip", "user1"),
-						makePlaylist("p2", "Chill Vibes", "user1"),
-						makePlaylist("p3", "Not Mine", "other"),
-					]),
-				);
 			if (path.startsWith("/me/tracks"))
 				return Promise.resolve(makePage([makeSavedTrack("Song 1")]));
 			if (path.startsWith("/playlists/p1/tracks"))
@@ -103,7 +99,7 @@ describe("scan", () => {
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources(p1, p2)));
 
 		const sourcesEvent = events.find((e) => e.type === "sources");
 		expect(sourcesEvent).toEqual({
@@ -114,44 +110,60 @@ describe("scan", () => {
 
 	it("emits sources event as the first event", async () => {
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists")) return Promise.resolve(makePage([]));
 			if (path.startsWith("/me/tracks"))
 				return Promise.resolve(makePage([makeSavedTrack("Song 1")]));
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources()));
 
 		expect(events[0]?.type).toBe("sources");
 	});
 
-	it("excludes non-owned playlists from sources event", async () => {
+	it("skips Liked Songs when includeLikedSongs is false", async () => {
+		const p1 = makePlaylist("p1", "My Playlist");
+
+		mockedGet.mockReset();
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists"))
-				return Promise.resolve(
-					makePage([makePlaylist("p1", "Mine", "user1"), makePlaylist("p2", "Followed", "other")]),
-				);
-			if (path.startsWith("/me/tracks")) return Promise.resolve(makePage([]));
-			if (path.startsWith("/playlists/p1/tracks")) return Promise.resolve(makePage([]));
+			if (path.startsWith("/playlists/p1/tracks"))
+				return Promise.resolve(makePage([makePlaylistTrack("Song")]));
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const config: ScanConfig = { includeLikedSongs: false, playlists: [p1] };
+		const events = await collectEvents(scan(config));
 
 		const sourcesEvent = events.find((e) => e.type === "sources");
 		expect(sourcesEvent).toEqual({
 			type: "sources",
-			names: ["Liked Songs", "Mine"],
+			names: ["My Playlist"],
+		});
+
+		// Should not have fetched /me/tracks
+		const calls = mockedGet.mock.calls.map(([p]) => p);
+		expect(calls.some((c) => c.startsWith("/me/tracks"))).toBe(false);
+	});
+
+	it("scans only Liked Songs when playlists array is empty", async () => {
+		mockedGet.mockImplementation((path: string) => {
+			if (path.startsWith("/me/tracks")) return Promise.resolve(makePage([makeSavedTrack("Song")]));
+			return Promise.resolve(makePage([]));
+		});
+
+		const config: ScanConfig = { includeLikedSongs: true, playlists: [] };
+		const events = await collectEvents(scan(config));
+
+		const sourcesEvent = events.find((e) => e.type === "sources");
+		expect(sourcesEvent).toEqual({
+			type: "sources",
+			names: ["Liked Songs"],
 		});
 	});
 
 	it("emits found events for unplayable tracks in Liked Songs and playlists", async () => {
+		const p1 = makePlaylist("p1", "My Playlist");
+
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists"))
-				return Promise.resolve(makePage([makePlaylist("p1", "My Playlist", "user1")]));
 			if (path.startsWith("/me/tracks"))
 				return Promise.resolve(
 					makePage([makeSavedTrack("Good Song"), makeSavedTrack("Dead Song", false)]),
@@ -163,7 +175,7 @@ describe("scan", () => {
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources(p1)));
 		const foundEvents = events.filter((e) => e.type === "found");
 
 		expect(foundEvents).toHaveLength(2);
@@ -179,14 +191,12 @@ describe("scan", () => {
 
 	it("done event contains correct summary with unplayable tracks", async () => {
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists")) return Promise.resolve(makePage([]));
 			if (path.startsWith("/me/tracks"))
 				return Promise.resolve(makePage([makeSavedTrack("OK"), makeSavedTrack("Bad", false)]));
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources()));
 		const doneEvent = events.find((e) => e.type === "done");
 
 		expect(doneEvent).toBeDefined();
@@ -197,14 +207,12 @@ describe("scan", () => {
 
 	it("done event for a clean library has empty unplayable array", async () => {
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists")) return Promise.resolve(makePage([]));
 			if (path.startsWith("/me/tracks"))
 				return Promise.resolve(makePage([makeSavedTrack("All Good")]));
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources()));
 		const doneEvent = events.find((e) => e.type === "done");
 
 		expect(doneEvent?.type === "done" && doneEvent.summary.unplayable).toHaveLength(0);
@@ -216,8 +224,6 @@ describe("scan", () => {
 		const page2Items = Array.from({ length: 25 }, (_, i) => makeSavedTrack(`Song ${50 + i}`));
 
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists")) return Promise.resolve(makePage([]));
 			if (path.startsWith("/me/tracks")) {
 				const url = new URL(`https://x${path}`);
 				const offset = Number(url.searchParams.get("offset") ?? "0");
@@ -241,17 +247,16 @@ describe("scan", () => {
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources()));
 		const doneEvent = events.find((e) => e.type === "done");
 
 		expect(doneEvent?.type === "done" && doneEvent.summary.totalScanned).toBe(75);
 	});
 
 	it("skips null tracks (deleted playlist tracks)", async () => {
+		const p1 = makePlaylist("p1", "Has Deleted");
+
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists"))
-				return Promise.resolve(makePage([makePlaylist("p1", "Has Deleted", "user1")]));
 			if (path.startsWith("/me/tracks")) return Promise.resolve(makePage([]));
 			if (path.startsWith("/playlists/p1/tracks"))
 				return Promise.resolve(
@@ -263,7 +268,7 @@ describe("scan", () => {
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources(p1)));
 		const doneEvent = events.find((e) => e.type === "done");
 
 		// Only "Real Song" should be scanned, null track is skipped
@@ -271,10 +276,9 @@ describe("scan", () => {
 	});
 
 	it("skips local tracks", async () => {
+		const p1 = makePlaylist("p1", "Has Local");
+
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists"))
-				return Promise.resolve(makePage([makePlaylist("p1", "Has Local", "user1")]));
 			if (path.startsWith("/me/tracks")) return Promise.resolve(makePage([]));
 			if (path.startsWith("/playlists/p1/tracks"))
 				return Promise.resolve(
@@ -286,7 +290,7 @@ describe("scan", () => {
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources(p1)));
 		const doneEvent = events.find((e) => e.type === "done");
 
 		// Only "Cloud Song" should be scanned, local track is skipped
@@ -295,14 +299,12 @@ describe("scan", () => {
 
 	it("includes smallest album image as thumbnailUrl on unplayable tracks", async () => {
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists")) return Promise.resolve(makePage([]));
 			if (path.startsWith("/me/tracks"))
 				return Promise.resolve(makePage([makeSavedTrack("Dead Song", false)]));
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources()));
 		const foundEvent = events.find((e) => e.type === "found");
 
 		expect(foundEvent?.type === "found" && foundEvent.track.thumbnailUrl).toBe(
@@ -312,8 +314,6 @@ describe("scan", () => {
 
 	it("omits thumbnailUrl when track has no album images", async () => {
 		mockedGet.mockImplementation((path: string) => {
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists")) return Promise.resolve(makePage([]));
 			if (path.startsWith("/me/tracks"))
 				return Promise.resolve(
 					makePage([{ track: makeTrackNoArt("No Art", false) } as SpotifySavedTrack]),
@@ -321,27 +321,9 @@ describe("scan", () => {
 			return Promise.resolve(makePage([]));
 		});
 
-		const events = await collectEvents(scan());
+		const events = await collectEvents(scan(allSources()));
 		const foundEvent = events.find((e) => e.type === "found");
 
 		expect(foundEvent?.type === "found" && foundEvent.track.thumbnailUrl).toBeUndefined();
-	});
-
-	it("prefetches playlists before emitting any progress events", async () => {
-		const callOrder: string[] = [];
-
-		mockedGet.mockImplementation((path: string) => {
-			callOrder.push(path);
-			if (path === "/me") return Promise.resolve(user);
-			if (path.startsWith("/me/playlists")) return Promise.resolve(makePage([]));
-			if (path.startsWith("/me/tracks")) return Promise.resolve(makePage([makeSavedTrack("Song")]));
-			return Promise.resolve(makePage([]));
-		});
-
-		await collectEvents(scan());
-
-		const playlistFetchIndex = callOrder.findIndex((p) => p.startsWith("/me/playlists"));
-		const trackFetchIndex = callOrder.findIndex((p) => p.startsWith("/me/tracks"));
-		expect(playlistFetchIndex).toBeLessThan(trackFetchIndex);
 	});
 });

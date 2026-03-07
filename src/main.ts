@@ -2,9 +2,10 @@
 
 import { get } from "./api";
 import { clearTokens, handleCallback, loadTokens, login, saveTokens } from "./auth";
-import { scan } from "./scanner";
+import { mountPicker, unmountPicker } from "./picker/mount";
+import { fetchOwnedPlaylists, scan } from "./scanner";
 import { mountTriageView, unmountTriageView } from "./triage/mount";
-import type { ScanSummary, SpotifyUser } from "./types";
+import type { ScanConfig, ScanSummary, SpotifyUser } from "./types";
 import {
 	markSourceComplete,
 	renderError,
@@ -27,27 +28,30 @@ function showTriageView(summary: ScanSummary): void {
 	app.innerHTML = "";
 	mountTriageView(app, summary, () => {
 		unmountTriageView(app);
-		startScan();
+		showScanScreen();
 	});
 }
 
 async function showScanScreen(): Promise<void> {
 	const user = await get<SpotifyUser>("/me");
 	const displayName = user.display_name ?? "Spotify User";
+	const playlists = await fetchOwnedPlaylists(user.id);
 
-	renderScanScreen(displayName, startScan, handleLogout);
+	const pickerContainer = renderScanScreen(displayName, handleLogout);
+	mountPicker(pickerContainer, playlists, startScan);
 }
 
-async function startScan(): Promise<void> {
+async function startScan(config: ScanConfig): Promise<void> {
 	const app = getApp();
 	unmountTriageView(app);
+	unmountPicker(app);
 	renderProgressScreen();
 	let unplayableCount = 0;
 	let lastSource = "";
 	let lastScanned = 0;
 
 	try {
-		for await (const event of scan()) {
+		for await (const event of scan(config)) {
 			if (event.type === "sources") {
 				renderSourceList(event.names);
 			}
@@ -68,7 +72,7 @@ async function startScan(): Promise<void> {
 					markSourceComplete(lastSource, lastScanned);
 				}
 				if (event.summary.unplayable.length === 0) {
-					renderSpotless(event.summary.totalScanned, startScan);
+					renderSpotless(event.summary.totalScanned, () => showScanScreen());
 				} else {
 					showTriageView(event.summary);
 				}

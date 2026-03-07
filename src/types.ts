@@ -45,6 +45,7 @@ export interface SpotifyPlaylist {
 	name: string;
 	owner: { id: string };
 	tracks: { total: number };
+	images: SpotifyImage[] | null;
 }
 
 export interface SpotifyUser {
@@ -77,6 +78,11 @@ export type ScanEvent =
 	| { type: "progress"; source: string; scanned: number; total: number }
 	| { type: "found"; track: UnplayableTrack }
 	| { type: "done"; summary: ScanSummary };
+
+export interface ScanConfig {
+	includeLikedSongs: boolean;
+	playlists: SpotifyPlaylist[];
+}
 
 export interface ScanSummary {
 	totalScanned: number;

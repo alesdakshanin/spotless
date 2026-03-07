@@ -16,6 +16,7 @@ vi.mock("../src/auth", () => ({
 
 vi.mock("../src/scanner", () => ({
 	scan: vi.fn(),
+	fetchOwnedPlaylists: vi.fn(),
 }));
 
 vi.mock("../src/ui", () => ({
@@ -34,12 +35,19 @@ vi.mock("../src/triage/mount", () => ({
 	unmountTriageView: vi.fn(),
 }));
 
+vi.mock("../src/picker/mount", () => ({
+	mountPicker: vi.fn(),
+	unmountPicker: vi.fn(),
+}));
+
 // --- Import mocked modules for assertions ---
 
 import { get } from "../src/api";
 import { clearTokens, handleCallback, loadTokens, saveTokens } from "../src/auth";
-import { scan } from "../src/scanner";
+import { mountPicker } from "../src/picker/mount";
+import { fetchOwnedPlaylists, scan } from "../src/scanner";
 import { mountTriageView } from "../src/triage/mount";
+import type { ScanConfig } from "../src/types";
 import {
 	markSourceComplete,
 	renderError,
@@ -55,6 +63,8 @@ const mockedGet = vi.mocked(get);
 const mockedLoadTokens = vi.mocked(loadTokens);
 const mockedHandleCallback = vi.mocked(handleCallback);
 const mockedScan = vi.mocked(scan);
+const mockedFetchOwnedPlaylists = vi.mocked(fetchOwnedPlaylists);
+const mockedMountPicker = vi.mocked(mountPicker);
 
 // --- Helpers ---
 
@@ -86,7 +96,18 @@ function throwingGenerator(error: Error): AsyncGenerator<import("../src/types").
 }
 
 const fakeUser = { id: "u1", display_name: "Ales", images: [] };
+const fakePlaylists = [
+	{ id: "p1", name: "Chill", owner: { id: "u1" }, tracks: { total: 10 }, images: [] },
+];
 const fakeTokens = { access_token: "at", refresh_token: "rt", expires_in: 3600 };
+
+function setupScanScreenMocks() {
+	mockedGet.mockResolvedValue(fakeUser);
+	mockedFetchOwnedPlaylists.mockResolvedValue(fakePlaylists);
+	// renderScanScreen returns a container div
+	const pickerContainer = document.createElement("div");
+	vi.mocked(renderScanScreen).mockReturnValue(pickerContainer);
+}
 
 // --- Tests ---
 
@@ -139,13 +160,14 @@ describe("init()", () => {
 	it("handles OAuth callback success", async () => {
 		setLocationSearch("?code=abc");
 		mockedHandleCallback.mockResolvedValue(fakeTokens);
-		mockedGet.mockResolvedValue(fakeUser);
+		setupScanScreenMocks();
 
 		await importMain();
 
 		expect(handleCallback).toHaveBeenCalledWith("abc");
 		expect(saveTokens).toHaveBeenCalledWith(fakeTokens);
 		expect(renderScanScreen).toHaveBeenCalled();
+		expect(mockedMountPicker).toHaveBeenCalled();
 	});
 
 	it("handles OAuth callback failure", async () => {
@@ -163,11 +185,16 @@ describe("init()", () => {
 			refreshToken: "rt",
 			expiresAt: Date.now() + 3600000,
 		});
-		mockedGet.mockResolvedValue(fakeUser);
+		setupScanScreenMocks();
 
 		await importMain();
 
 		expect(renderScanScreen).toHaveBeenCalled();
+		expect(mockedMountPicker).toHaveBeenCalledWith(
+			expect.any(HTMLElement),
+			fakePlaylists,
+			expect.any(Function),
+		);
 	});
 
 	it("clears invalid session", async () => {
@@ -191,14 +218,12 @@ describe("init()", () => {
 			expiresAt: Date.now() + 3600000,
 		});
 		mockedGet.mockResolvedValue({ id: "u1", display_name: null, images: [] });
+		mockedFetchOwnedPlaylists.mockResolvedValue([]);
+		vi.mocked(renderScanScreen).mockReturnValue(document.createElement("div"));
 
 		await importMain();
 
-		expect(renderScanScreen).toHaveBeenCalledWith(
-			"Spotify User",
-			expect.any(Function),
-			expect.any(Function),
-		);
+		expect(renderScanScreen).toHaveBeenCalledWith("Spotify User", expect.any(Function));
 	});
 });
 
@@ -221,22 +246,22 @@ describe("startScan()", () => {
 		document.querySelector("#app")?.remove();
 	});
 
-	/** Import main, wait for init, then capture and return the onScan callback */
-	async function getStartScan(): Promise<() => Promise<void>> {
+	/** Import main, wait for init, then capture and return the onScan callback from mountPicker */
+	async function getStartScan(): Promise<(config: ScanConfig) => Promise<void>> {
 		mockedLoadTokens.mockReturnValue({
 			accessToken: "at",
 			refreshToken: "rt",
 			expiresAt: Date.now() + 3600000,
 		});
-		mockedGet.mockResolvedValue(fakeUser);
+		setupScanScreenMocks();
 
 		await import("../src/main");
 		await vi.waitFor(() => {
-			if (vi.mocked(renderScanScreen).mock.calls.length === 0) throw new Error("not ready");
+			if (mockedMountPicker.mock.calls.length === 0) throw new Error("not ready");
 		});
 
-		// renderScanScreen(displayName, startScan, handleLogout)
-		const onScan = vi.mocked(renderScanScreen).mock.calls[0]?.[1] as () => Promise<void>;
+		// mountPicker(container, playlists, onScan)
+		const onScan = mockedMountPicker.mock.calls[0]?.[2] as (config: ScanConfig) => Promise<void>;
 		expect(onScan).toBeDefined();
 
 		// Reset mocks so startScan assertions are clean
@@ -251,6 +276,8 @@ describe("startScan()", () => {
 		return onScan;
 	}
 
+	const defaultConfig: ScanConfig = { includeLikedSongs: true, playlists: [] };
+
 	it("maps sources event to renderSourceList", async () => {
 		const onScan = await getStartScan();
 		mockedScan.mockReturnValue(
@@ -260,7 +287,7 @@ describe("startScan()", () => {
 			]),
 		);
 
-		await onScan();
+		await onScan(defaultConfig);
 
 		expect(renderSourceList).toHaveBeenCalledWith(["Liked Songs", "Chill"]);
 	});
@@ -275,7 +302,7 @@ describe("startScan()", () => {
 			]),
 		);
 
-		await onScan();
+		await onScan(defaultConfig);
 
 		expect(updateSourceProgress).toHaveBeenCalledWith("Liked Songs", 10, 50, 0);
 	});
@@ -291,7 +318,7 @@ describe("startScan()", () => {
 			]),
 		);
 
-		await onScan();
+		await onScan(defaultConfig);
 
 		expect(markSourceComplete).toHaveBeenCalledWith("A", 5);
 	});
@@ -306,7 +333,7 @@ describe("startScan()", () => {
 			]),
 		);
 
-		await onScan();
+		await onScan(defaultConfig);
 
 		expect(markSourceComplete).toHaveBeenCalledWith("A", 5);
 	});
@@ -323,7 +350,7 @@ describe("startScan()", () => {
 			]),
 		);
 
-		await onScan();
+		await onScan(defaultConfig);
 
 		// After found event, updateSourceProgress should be called with count=1
 		const calls = vi.mocked(updateSourceProgress).mock.calls;
@@ -340,7 +367,7 @@ describe("startScan()", () => {
 			]),
 		);
 
-		await onScan();
+		await onScan(defaultConfig);
 
 		expect(renderSpotless).toHaveBeenCalledWith(10, expect.any(Function));
 	});
@@ -358,7 +385,7 @@ describe("startScan()", () => {
 			]),
 		);
 
-		await onScan();
+		await onScan(defaultConfig);
 
 		expect(mountTriageView).toHaveBeenCalledWith(
 			expect.any(HTMLElement),
@@ -371,7 +398,7 @@ describe("startScan()", () => {
 		const onScan = await getStartScan();
 		mockedScan.mockReturnValue(throwingGenerator(new Error("Network failed")));
 
-		await onScan();
+		await onScan(defaultConfig);
 
 		expect(renderError).toHaveBeenCalledWith("Network failed", expect.any(Function));
 	});

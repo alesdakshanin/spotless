@@ -2,6 +2,7 @@
 
 import { get } from "./api";
 import type {
+	ScanConfig,
 	ScanEvent,
 	ScanSummary,
 	SpotifyPaginatedResponse,
@@ -9,7 +10,6 @@ import type {
 	SpotifyPlaylistTrack,
 	SpotifySavedTrack,
 	SpotifyTrack,
-	SpotifyUser,
 	UnplayableTrack,
 } from "./types";
 
@@ -84,7 +84,7 @@ async function* scanSource<T extends SpotifySavedTrack | SpotifyPlaylistTrack>(
 	} while (offset < total);
 }
 
-async function fetchOwnedPlaylists(userId: string): Promise<SpotifyPlaylist[]> {
+export async function fetchOwnedPlaylists(userId: string): Promise<SpotifyPlaylist[]> {
 	const ownedPlaylists: SpotifyPlaylist[] = [];
 	let offset = 0;
 	let hasMore = true;
@@ -107,35 +107,34 @@ async function fetchOwnedPlaylists(userId: string): Promise<SpotifyPlaylist[]> {
 	return ownedPlaylists;
 }
 
-export async function* scan(): AsyncGenerator<ScanEvent> {
+export async function* scan(config: ScanConfig): AsyncGenerator<ScanEvent> {
 	const unplayable: UnplayableTrack[] = [];
 	let totalScanned = 0;
 
-	// Prefetch user and owned playlists before scanning
-	const user = await get<SpotifyUser>("/me");
-	const ownedPlaylists = await fetchOwnedPlaylists(user.id);
+	// Emit selected source names upfront
+	const sourceNames = [
+		...(config.includeLikedSongs ? ["Liked Songs"] : []),
+		...config.playlists.map((p) => p.name),
+	];
+	yield { type: "sources", names: sourceNames };
 
-	// Emit all source names upfront
-	yield {
-		type: "sources",
-		names: ["Liked Songs", ...ownedPlaylists.map((p) => p.name)],
-	};
-
-	// Scan Liked Songs
-	let likedSongsScanned = 0;
-	for await (const event of scanSource<SpotifySavedTrack>("/me/tracks", "Liked Songs", null)) {
-		if (event.type === "found") {
-			unplayable.push(event.track);
+	// Scan Liked Songs (if selected)
+	if (config.includeLikedSongs) {
+		let likedSongsScanned = 0;
+		for await (const event of scanSource<SpotifySavedTrack>("/me/tracks", "Liked Songs", null)) {
+			if (event.type === "found") {
+				unplayable.push(event.track);
+			}
+			if (event.type === "progress") {
+				likedSongsScanned = event.scanned;
+			}
+			yield event;
 		}
-		if (event.type === "progress") {
-			likedSongsScanned = event.scanned;
-		}
-		yield event;
+		totalScanned += likedSongsScanned;
 	}
-	totalScanned += likedSongsScanned;
 
-	// Scan each owned playlist
-	for (const playlist of ownedPlaylists) {
+	// Scan selected playlists
+	for (const playlist of config.playlists) {
 		let playlistScanned = 0;
 
 		for await (const event of scanSource<SpotifyPlaylistTrack>(

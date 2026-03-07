@@ -6,16 +6,17 @@ context: |
   and lets users remove dead tracks and add replacements.
 
   Tech stack:
-    - Vite + vanilla TypeScript (no framework)
+    - Vite + TypeScript
+    - Preact + @preact/signals for interactive UI (island architecture)
     - Vitest for testing
-    - Plain CSS
+    - Tailwind CSS
     - Spotify Web API with Authorization Code + PKCE (no backend)
     - Hosted on GitHub Pages
 
   Conventions:
     - Core logic (auth, API, scanner) as pure functions / async — easy to test
-    - Thin UI layer for DOM rendering
-    - No framework unless complexity demands it (Preact as escape hatch)
+    - Simple screens (login, scan, progress) use vanilla DOM rendering
+    - Interactive components (triage view, playlist picker) use Preact islands
 
 
 # Per-artifact rules (optional)

@@ -6,7 +6,8 @@ Browser-based utility that scans a user's Spotify library and playlists for unpl
 
 ## Tech Stack
 
-- Vite + vanilla TypeScript (no framework)
+- Vite + TypeScript
+- Preact + @preact/signals for interactive UI (island architecture)
 - Biome for formatting and linting
 - Tailwind CSS
 - Vitest for testing
@@ -29,8 +30,8 @@ Use the OpenSpec workflow (`/opsx:new`, `/opsx:ff`, `/opsx:apply`, etc.) for new
 ## Architecture
 
 - Core logic (auth, API, scanner) as pure functions / async modules — easy to test
-- Thin UI layer for DOM rendering
-- No framework unless complexity demands it
+- Simple screens (login, scan, progress) use vanilla DOM rendering
+- Interactive components (triage view, playlist picker) use Preact islands — mount/unmount into a container, no shared DOM manipulation
 
 ## Conventions
 

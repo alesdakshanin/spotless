@@ -61,11 +61,7 @@ export function renderLogin(onLogin: () => void): void {
 
 // --- Scan screen (5.2) ---
 
-export function renderScanScreen(
-	displayName: string,
-	onScan: () => void,
-	onLogout: () => void,
-): void {
+export function renderScanScreen(displayName: string, onLogout: () => void): HTMLDivElement {
 	const app = getApp();
 	app.innerHTML = "";
 
@@ -78,15 +74,7 @@ export function renderScanScreen(
 	);
 	logoutBtn.addEventListener("click", onLogout);
 
-	const scanBtn = h(
-		"button",
-		{
-			class:
-				"bg-accent hover:bg-accent/85 text-black font-bold py-3.5 px-9 rounded text-[13px] transition-colors cursor-pointer",
-		},
-		"Scan Library",
-	);
-	scanBtn.addEventListener("click", onScan);
+	const pickerContainer = h("div", { id: "picker-root" });
 
 	const container = h(
 		"div",
@@ -102,10 +90,11 @@ export function renderScanScreen(
 		),
 		h("h1", { class: "text-[52px] font-bold tracking-[-2px] mb-2" }, "Spotless"),
 		h("p", { class: "text-app-muted text-[13px] mb-4" }, "Scan your library for unplayable tracks"),
-		scanBtn,
+		pickerContainer,
 	);
 
 	app.appendChild(container);
+	return pickerContainer;
 }
 
 // --- Progress display (5.3) ---
