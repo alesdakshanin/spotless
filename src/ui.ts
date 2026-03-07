@@ -74,13 +74,13 @@ export function renderScanScreen(displayName: string, onLogout: () => void): HTM
 	);
 	logoutBtn.addEventListener("click", onLogout);
 
-	const pickerContainer = h("div", { id: "picker-root" });
+	const pickerContainer = h("div", { id: "picker-root", class: "w-full max-w-2xl" });
 
 	const container = h(
 		"div",
 		{
 			class:
-				"min-h-screen flex flex-col items-center justify-center bg-app-gradient text-app-text px-4",
+				"min-h-screen flex flex-col items-center bg-app-gradient text-app-text px-4 py-12 pb-36",
 		},
 		h(
 			"div",
@@ -88,8 +88,12 @@ export function renderScanScreen(displayName: string, onLogout: () => void): HTM
 			h("span", { class: "text-app-text/80 text-[13px]" }, displayName),
 			logoutBtn,
 		),
-		h("h1", { class: "text-[52px] font-bold tracking-[-2px] mb-2" }, "Spotless"),
-		h("p", { class: "text-app-muted text-[13px] mb-4" }, "Scan your library for unplayable tracks"),
+		h("h1", { class: "text-[34px] font-bold tracking-[-2px] mb-2 text-app-muted" }, "Spotless"),
+		h(
+			"p",
+			{ class: "text-app-muted text-[13px] mb-8" },
+			"Select sources to scan for unplayable tracks",
+		),
 		pickerContainer,
 	);
 
