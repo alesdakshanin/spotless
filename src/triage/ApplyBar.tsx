@@ -5,9 +5,11 @@ import { summarizeOps } from "./summarizeOps";
 
 export function ApplyBar({
 	pendingOps,
+	disabled = false,
 	onApply,
 }: {
 	pendingOps: PendingOp[];
+	disabled?: boolean;
 	onApply: () => void;
 }) {
 	if (pendingOps.length === 0) return null;
@@ -19,8 +21,13 @@ export function ApplyBar({
 			<span class="text-app-text text-[13px]">{summary}</span>
 			<button
 				type="button"
-				onClick={onApply}
-				class="bg-accent hover:bg-accent/85 text-black font-bold py-2.5 px-6 rounded text-[13px] transition-colors cursor-pointer"
+				onClick={disabled ? undefined : onApply}
+				disabled={disabled}
+				class={`font-bold py-2.5 px-6 rounded text-[13px] transition-colors ${
+					disabled
+						? "bg-accent/40 text-black/50 cursor-not-allowed"
+						: "bg-accent hover:bg-accent/85 text-black cursor-pointer"
+				}`}
 			>
 				Apply Changes
 			</button>

@@ -6,32 +6,12 @@ import { ApplyBar } from "./ApplyBar";
 import type { BatchResult } from "./batch";
 import { FilterBar } from "./FilterBar";
 import { MiniPlayer } from "./MiniPlayer";
+import { NoMatchSection } from "./NoMatchSection";
 import { ReviewModal } from "./ReviewModal";
-import type { TriageStore, TriageTrack } from "./state";
+import { SummaryCounters } from "./SummaryCounters";
+import { SwapSection } from "./SwapSection";
+import type { TriageStore } from "./state";
 import { markTracksApplied } from "./state";
-import { TrackRow } from "./TrackRow";
-
-function groupBySource(tracks: TriageTrack[]): [string, TriageTrack[]][] {
-	const groups = new Map<string, TriageTrack[]>();
-	for (const t of tracks) {
-		const key = t.track.source;
-		const group = groups.get(key);
-		if (group) {
-			group.push(t);
-		} else {
-			groups.set(key, [t]);
-		}
-	}
-
-	// Sort: Liked Songs first, then alphabetical
-	const sorted = [...groups.entries()].sort(([a], [b]) => {
-		if (a === "Liked Songs") return -1;
-		if (b === "Liked Songs") return 1;
-		return a.localeCompare(b);
-	});
-
-	return sorted;
-}
 
 export function TriageView({
 	store,
@@ -48,8 +28,12 @@ export function TriageView({
 	const pendingOps = store.pendingOps.value;
 	const expandedId = store.expandedTrackId.value;
 	const isSearching = progress.completed < progress.total;
+	const activeFilter = store.filter.value;
 
-	const groups = groupBySource(filteredTracks);
+	const swapTracks = filteredTracks.filter((t) => t.candidates.length > 0);
+	const noMatchTracks = filteredTracks.filter(
+		(t) => t.searchStatus === "done" && t.candidates.length === 0,
+	);
 
 	const handleComplete = (result: BatchResult) => {
 		const appliedTrackIds = result.succeeded.map((op) => op.trackId);
@@ -74,33 +58,32 @@ export function TriageView({
 				>
 					{isSearching ? (
 						<span class="animate-pulse">
-							Finding replacements: {progress.completed}/{progress.total}
+							Finding swaps: {progress.completed}/{progress.total}
 						</span>
 					) : (
 						<span>
-							Replacement search complete — {progress.total}/{progress.total} tracks scanned
+							Swap search complete — {progress.total}/{progress.total} tracks scanned
 						</span>
 					)}
 				</div>
 			</div>
 
-			{/* Filter bar + select all */}
+			{/* Summary counters + filter bar */}
 			<div class="w-full max-w-2xl">
+				<SummaryCounters counts={store.sectionCounts.value} />
 				<FilterBar store={store} />
 			</div>
 
-			{/* Track list */}
+			{/* Track sections */}
 			<div class="w-full max-w-2xl">
-				{groups.map(([source, tracks]) => (
-					<div key={source}>
-						<div class="text-app-muted/60 text-[10px] uppercase tracking-wider mt-4 mb-1 px-1">
-							{source}
-						</div>
-						{tracks.map((t) => (
-							<TrackRow key={t.id} triageTrack={t} store={store} isExpanded={expandedId === t.id} />
-						))}
-					</div>
-				))}
+				{swapTracks.length > 0 && activeFilter !== "no-match" && (
+					<SwapSection store={store} tracks={swapTracks} expandedId={expandedId} />
+				)}
+				{noMatchTracks.length > 0 &&
+					activeFilter !== "auto-proposed" &&
+					activeFilter !== "needs-review" && (
+						<NoMatchSection store={store} tracks={noMatchTracks} expandedId={expandedId} />
+					)}
 			</div>
 
 			{/* Scan again */}
@@ -119,6 +102,7 @@ export function TriageView({
 				<MiniPlayer />
 				<ApplyBar
 					pendingOps={pendingOps}
+					disabled={isSearching}
 					onApply={() => {
 						showModal.value = true;
 					}}

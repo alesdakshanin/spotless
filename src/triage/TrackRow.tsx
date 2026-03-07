@@ -39,10 +39,12 @@ export function TrackRow({
 	triageTrack,
 	store,
 	isExpanded,
+	variant = "swap",
 }: {
 	triageTrack: TriageTrack;
 	store: TriageStore;
 	isExpanded: boolean;
+	variant?: "swap" | "removal";
 }) {
 	const { track, checked, candidates, searchStatus, applied } = triageTrack;
 	const hasCandidates = candidates.length > 0;
@@ -58,7 +60,7 @@ export function TrackRow({
 				type="button"
 				class={`flex items-center gap-2 py-2.5 border-b border-white/[0.06] cursor-pointer hover:bg-white/[0.02] transition-colors w-full text-left ${
 					isAutoProposed && checked ? "border-l-2 border-l-accent/40 pl-1" : ""
-				}`}
+				} ${variant === "removal" && checked ? "bg-red-500/[0.06]" : ""}`}
 				onClick={() => toggleExpanded(store, triageTrack.id)}
 			>
 				{/* Checkbox */}
@@ -71,7 +73,6 @@ export function TrackRow({
 						type="checkbox"
 						class="sr-only"
 						checked={checked}
-						disabled={!hasCandidates && searchStatus === "done"}
 						onChange={(e) => {
 							e.stopPropagation();
 							toggleCheck(store, triageTrack.id);
@@ -79,11 +80,11 @@ export function TrackRow({
 					/>
 					<span
 						class={`w-4 h-4 rounded-sm border flex items-center justify-center text-[10px] ${
-							!hasCandidates && searchStatus === "done"
-								? "border-app-muted/30 opacity-40"
-								: checked
-									? "bg-accent border-accent text-black cursor-pointer"
-									: "border-app-muted/50 cursor-pointer"
+							checked
+								? variant === "removal"
+									? "bg-red-500 border-red-500 text-white cursor-pointer"
+									: "bg-accent border-accent text-black cursor-pointer"
+								: "border-app-muted/50 cursor-pointer"
 						}`}
 					>
 						{checked ? "✓" : ""}
@@ -103,7 +104,11 @@ export function TrackRow({
 
 				{/* Track info */}
 				<div class="flex-1 min-w-0">
-					<p class="text-app-text text-[13px] font-medium truncate">{track.name}</p>
+					<p
+						class={`text-app-text text-[13px] font-medium truncate ${variant === "removal" && checked ? "line-through text-app-muted" : ""}`}
+					>
+						{track.name}
+					</p>
 					<p class="text-app-muted text-[11px] truncate">{track.artists.join(", ")}</p>
 				</div>
 

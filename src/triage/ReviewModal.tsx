@@ -87,6 +87,58 @@ export function ReviewModal({
 	);
 }
 
+interface SwapItem {
+	trackId: string;
+	candidateName: string;
+	source: string;
+	confidence?: 1 | 2 | 3;
+}
+
+interface RemovalItem {
+	trackId: string;
+	trackName: string;
+	artistNames: string;
+	source: string;
+}
+
+function groupOpsForReview(ops: PendingOp[]): { swaps: SwapItem[]; removals: RemovalItem[] } {
+	const trackOps = new Map<string, { add?: PendingOp; remove?: PendingOp }>();
+	for (const op of ops) {
+		const entry = trackOps.get(op.trackId) ?? {};
+		if (op.type === "add") entry.add = op;
+		else entry.remove = op;
+		trackOps.set(op.trackId, entry);
+	}
+
+	const swaps: SwapItem[] = [];
+	const removals: RemovalItem[] = [];
+	for (const [trackId, { add, remove }] of trackOps) {
+		if (add && remove) {
+			swaps.push({
+				trackId,
+				candidateName: add.candidateName ?? add.trackName,
+				source: add.source,
+				confidence: add.confidence,
+			});
+		} else if (add) {
+			swaps.push({
+				trackId,
+				candidateName: add.candidateName ?? add.trackName,
+				source: add.source,
+				confidence: add.confidence,
+			});
+		} else if (remove) {
+			removals.push({
+				trackId,
+				trackName: remove.trackName,
+				artistNames: remove.artistNames,
+				source: remove.source,
+			});
+		}
+	}
+	return { swaps, removals };
+}
+
 function ReviewContent({
 	pendingOps,
 	summary,
@@ -98,6 +150,8 @@ function ReviewContent({
 	onCancel: () => void;
 	onApply: () => void;
 }) {
+	const { swaps, removals } = groupOpsForReview(pendingOps);
+
 	return (
 		<>
 			<div class="p-5 border-b border-white/[0.08]">
@@ -108,26 +162,34 @@ function ReviewContent({
 			</div>
 
 			<div class="flex-1 overflow-y-auto p-5">
-				{pendingOps.map((op, i) => (
-					<div key={`${op.trackId}-${op.type}-${i}`} class="flex items-center gap-2 py-2">
-						<span
-							class={`text-[10px] font-bold px-2 py-0.5 rounded ${
-								op.type === "add" ? "bg-accent/20 text-accent" : "bg-app-error/20 text-app-error"
-							}`}
-						>
-							{op.type === "add" ? "ADD" : "REMOVE"}
+				{swaps.map((item) => (
+					<div key={`swap-${item.trackId}`} class="flex items-center gap-2 py-2">
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-accent/20 text-accent">
+							SWAP
 						</span>
 						<div class="flex-1 min-w-0">
-							<p class="text-app-text text-[12px] truncate">
-								{op.type === "add" ? op.candidateName : op.trackName}
-							</p>
-							<p class="text-app-muted text-[10px] truncate">
-								{op.type === "add" ? `→ ${op.source}` : `from ${op.source}`}
-							</p>
+							<p class="text-app-text text-[12px] truncate">{item.candidateName}</p>
+							<p class="text-app-muted text-[10px] truncate">→ {item.source}</p>
 						</div>
-						{op.confidence && (
-							<span class="text-amber-400 text-[10px] shrink-0">{"★".repeat(op.confidence)}</span>
+						{item.confidence && (
+							<span class="text-amber-400 text-[10px] shrink-0">{"★".repeat(item.confidence)}</span>
 						)}
+					</div>
+				))}
+
+				{swaps.length > 0 && removals.length > 0 && (
+					<div class="border-t border-white/[0.06] my-2" />
+				)}
+
+				{removals.map((item) => (
+					<div key={`rmv-${item.trackId}`} class="flex items-center gap-2 py-2">
+						<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-app-error/20 text-app-error">
+							RMV
+						</span>
+						<div class="flex-1 min-w-0">
+							<p class="text-app-text text-[12px] truncate">{item.trackName}</p>
+							<p class="text-app-muted text-[10px] truncate">from {item.source}</p>
+						</div>
 					</div>
 				))}
 			</div>
@@ -188,7 +250,7 @@ function DoneContent({
 				<>
 					<span class="text-accent text-4xl">✓</span>
 					<p class="text-app-text text-[16px] font-bold">All changes applied!</p>
-					<p class="text-app-muted text-[13px]">{result.succeeded.length} changes applied</p>
+					<p class="text-app-muted text-[13px]">{summarizeOps(result.succeeded)}</p>
 				</>
 			) : (
 				<>

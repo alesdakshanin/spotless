@@ -44,6 +44,12 @@ export interface SearchProgress {
 	total: number;
 }
 
+export interface SectionCounts {
+	swapping: number;
+	removing: number;
+	noMatch: number;
+}
+
 export type SelectAllState = "none" | "some" | "all";
 
 // --- Store ---
@@ -56,8 +62,11 @@ export interface TriageStore {
 
 	filteredTracks: ReadonlySignal<TriageTrack[]>;
 	counts: ReadonlySignal<FilterCounts>;
+	sectionCounts: ReadonlySignal<SectionCounts>;
 	pendingOps: ReadonlySignal<PendingOp[]>;
 	selectAllState: ReadonlySignal<SelectAllState>;
+	swapSelectAllState: ReadonlySignal<SelectAllState>;
+	noMatchSelectAllState: ReadonlySignal<SelectAllState>;
 	selectedCount: ReadonlySignal<number>;
 }
 
@@ -114,6 +123,22 @@ export function createTriageStore(unplayableTracks: UnplayableTrack[]): TriageSt
 		};
 	});
 
+	const sectionCounts = computed<SectionCounts>(() => {
+		const all = tracks.value;
+		let swapping = 0;
+		let removing = 0;
+		let noMatch = 0;
+		for (const t of all) {
+			if (t.applied) continue;
+			const isNoMatch = t.searchStatus === "done" && t.candidates.length === 0;
+			if (isNoMatch) noMatch++;
+			if (t.checked && !isNoMatch && t.candidates.length > 0) swapping++;
+			if (t.checked && isNoMatch) removing++;
+			if (t.checked && !isNoMatch && t.removeOriginal) removing++;
+		}
+		return { swapping, removing, noMatch };
+	});
+
 	const pendingOps = computed<PendingOp[]>(() => {
 		const ops: PendingOp[] = [];
 		for (const t of tracks.value) {
@@ -145,6 +170,18 @@ export function createTriageStore(unplayableTracks: UnplayableTrack[]): TriageSt
 					trackUri: t.track.trackUri,
 				});
 			}
+			// No-match track checked for removal
+			if (t.candidates.length === 0 && t.searchStatus === "done" && !t.selectedCandidateId) {
+				ops.push({
+					type: "remove",
+					trackId: t.id,
+					trackName: t.track.name,
+					artistNames,
+					source: t.track.source,
+					sourceId: t.track.sourceId,
+					trackUri: t.track.trackUri,
+				});
+			}
 		}
 		return ops;
 	});
@@ -158,6 +195,26 @@ export function createTriageStore(unplayableTracks: UnplayableTrack[]): TriageSt
 		return "some";
 	});
 
+	const swapSelectAllState = computed<SelectAllState>(() => {
+		const swapTracks = tracks.value.filter((t) => t.candidates.length > 0 && !t.applied);
+		if (swapTracks.length === 0) return "none";
+		const checkedCount = swapTracks.filter((t) => t.checked).length;
+		if (checkedCount === 0) return "none";
+		if (checkedCount === swapTracks.length) return "all";
+		return "some";
+	});
+
+	const noMatchSelectAllState = computed<SelectAllState>(() => {
+		const noMatchTracks = tracks.value.filter(
+			(t) => t.searchStatus === "done" && t.candidates.length === 0 && !t.applied,
+		);
+		if (noMatchTracks.length === 0) return "none";
+		const checkedCount = noMatchTracks.filter((t) => t.checked).length;
+		if (checkedCount === 0) return "none";
+		if (checkedCount === noMatchTracks.length) return "all";
+		return "some";
+	});
+
 	const selectedCount = computed(() => tracks.value.filter((t) => t.checked && !t.applied).length);
 
 	return {
@@ -167,8 +224,11 @@ export function createTriageStore(unplayableTracks: UnplayableTrack[]): TriageSt
 		expandedTrackId,
 		filteredTracks,
 		counts,
+		sectionCounts,
 		pendingOps,
 		selectAllState,
+		swapSelectAllState,
+		noMatchSelectAllState,
 		selectedCount,
 	};
 }
@@ -238,6 +298,39 @@ export function deselectAllVisible(store: TriageStore): void {
 	store.tracks.value = store.tracks.value.map((t) => {
 		if (!visibleIds.has(t.id)) return t;
 		return { ...t, checked: false, selectedCandidateId: null, removeOriginal: false };
+	});
+}
+
+export function selectAllSwapSection(store: TriageStore): void {
+	store.tracks.value = store.tracks.value.map((t) => {
+		if (t.applied || t.candidates.length === 0) return t;
+		return {
+			...t,
+			checked: true,
+			selectedCandidateId: t.selectedCandidateId ?? bestCandidateId(t.candidates),
+			removeOriginal: bestConfidence(t.candidates) === 3 ? true : t.removeOriginal,
+		};
+	});
+}
+
+export function deselectAllSwapSection(store: TriageStore): void {
+	store.tracks.value = store.tracks.value.map((t) => {
+		if (t.candidates.length === 0) return t;
+		return { ...t, checked: false, selectedCandidateId: null, removeOriginal: false };
+	});
+}
+
+export function selectAllNoMatchSection(store: TriageStore): void {
+	store.tracks.value = store.tracks.value.map((t) => {
+		if (t.applied || t.candidates.length > 0 || t.searchStatus !== "done") return t;
+		return { ...t, checked: true };
+	});
+}
+
+export function deselectAllNoMatchSection(store: TriageStore): void {
+	store.tracks.value = store.tracks.value.map((t) => {
+		if (t.candidates.length > 0 || t.searchStatus !== "done") return t;
+		return { ...t, checked: false };
 	});
 }
 

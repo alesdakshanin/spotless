@@ -2,9 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { ReplacementCandidate, UnplayableTrack } from "../types";
 import {
 	createTriageStore,
+	deselectAllNoMatchSection,
+	deselectAllSwapSection,
 	deselectAllVisible,
 	markTracksApplied,
 	searchAllReplacements,
+	selectAllNoMatchSection,
+	selectAllSwapSection,
 	selectAllVisible,
 	selectCandidate,
 	setFilter,
@@ -460,5 +464,208 @@ describe("searchAllReplacements", () => {
 
 		// After final search, progress should be 2/2
 		expect(store.searchProgress.value).toEqual({ completed: 2, total: 2 });
+	});
+});
+
+// --- pendingOps with no-match removals ---
+
+describe("pendingOps — no-match removals", () => {
+	it("generates remove op for checked no-match track", () => {
+		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			candidates: [],
+			searchStatus: "done" as const,
+		}));
+
+		toggleCheck(store, "spotify:track:abc123");
+
+		const ops = store.pendingOps.value;
+		expect(ops).toHaveLength(1);
+		expect(ops[0]?.type).toBe("remove");
+		expect(ops[0]?.trackUri).toBe("spotify:track:abc123");
+	});
+
+	it("does not generate remove op for unchecked no-match track", () => {
+		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			candidates: [],
+			searchStatus: "done" as const,
+		}));
+
+		expect(store.pendingOps.value).toEqual([]);
+	});
+
+	it("does not generate remove op for pending tracks", () => {
+		const store = createTriageStore([makeTrack()]);
+		// searchStatus is "pending" by default, candidates empty
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			checked: true,
+		}));
+
+		// No candidates and pending — should not create a no-match removal
+		expect(store.pendingOps.value).toEqual([]);
+	});
+});
+
+// --- sectionCounts ---
+
+describe("sectionCounts", () => {
+	function storeWithMixedTracks() {
+		const store = createTriageStore([
+			makeTrack({ trackUri: "spotify:track:a" }),
+			makeTrack({ trackUri: "spotify:track:b" }),
+			makeTrack({ trackUri: "spotify:track:c" }),
+		]);
+		store.tracks.value = store.tracks.value.map((t, i) => ({
+			...t,
+			candidates: i === 0 ? [makeCandidate(3, "spotify:track:r0")] : [],
+			searchStatus: "done" as const,
+		}));
+		return store;
+	}
+
+	it("counts noMatch tracks", () => {
+		const store = storeWithMixedTracks();
+		expect(store.sectionCounts.value.noMatch).toBe(2);
+	});
+
+	it("counts swapping when swap track is checked", () => {
+		const store = storeWithMixedTracks();
+		toggleCheck(store, "spotify:track:a");
+		expect(store.sectionCounts.value.swapping).toBe(1);
+	});
+
+	it("counts removing when no-match track is checked", () => {
+		const store = storeWithMixedTracks();
+		toggleCheck(store, "spotify:track:b");
+		expect(store.sectionCounts.value.removing).toBe(1);
+	});
+
+	it("counts removing when swap track has removeOriginal", () => {
+		const store = storeWithMixedTracks();
+		toggleCheck(store, "spotify:track:a"); // confidence 3 → auto removeOriginal
+		// swapping=1, removing=1 (for removeOriginal)
+		expect(store.sectionCounts.value.swapping).toBe(1);
+		expect(store.sectionCounts.value.removing).toBe(1);
+	});
+
+	it("returns zeros when nothing checked", () => {
+		const store = storeWithMixedTracks();
+		expect(store.sectionCounts.value).toEqual({ swapping: 0, removing: 0, noMatch: 2 });
+	});
+});
+
+// --- per-section select-all ---
+
+describe("selectAllSwapSection / deselectAllSwapSection", () => {
+	function storeWithMixedTracks() {
+		const store = createTriageStore([
+			makeTrack({ trackUri: "spotify:track:a" }),
+			makeTrack({ trackUri: "spotify:track:b" }),
+			makeTrack({ trackUri: "spotify:track:c" }),
+		]);
+		store.tracks.value = store.tracks.value.map((t, i) => ({
+			...t,
+			candidates: i < 2 ? [makeCandidate(3, `spotify:track:r${i}`)] : [],
+			searchStatus: "done" as const,
+		}));
+		return store;
+	}
+
+	it("selects all swap-section tracks", () => {
+		const store = storeWithMixedTracks();
+		selectAllSwapSection(store);
+
+		expect(store.tracks.value[0]?.checked).toBe(true);
+		expect(store.tracks.value[1]?.checked).toBe(true);
+		// no-match track should remain unchecked
+		expect(store.tracks.value[2]?.checked).toBe(false);
+	});
+
+	it("deselects all swap-section tracks", () => {
+		const store = storeWithMixedTracks();
+		selectAllSwapSection(store);
+		deselectAllSwapSection(store);
+
+		expect(store.tracks.value[0]?.checked).toBe(false);
+		expect(store.tracks.value[1]?.checked).toBe(false);
+	});
+
+	it("does not select applied tracks", () => {
+		const store = storeWithMixedTracks();
+		store.tracks.value = store.tracks.value.map((t, i) => (i === 0 ? { ...t, applied: true } : t));
+		selectAllSwapSection(store);
+
+		expect(store.tracks.value[0]?.checked).toBe(false);
+		expect(store.tracks.value[1]?.checked).toBe(true);
+	});
+
+	it("computes swapSelectAllState correctly", () => {
+		const store = storeWithMixedTracks();
+		expect(store.swapSelectAllState.value).toBe("none");
+
+		toggleCheck(store, "spotify:track:a");
+		expect(store.swapSelectAllState.value).toBe("some");
+
+		toggleCheck(store, "spotify:track:b");
+		expect(store.swapSelectAllState.value).toBe("all");
+	});
+});
+
+describe("selectAllNoMatchSection / deselectAllNoMatchSection", () => {
+	function storeWithNoMatch() {
+		const store = createTriageStore([
+			makeTrack({ trackUri: "spotify:track:a" }),
+			makeTrack({ trackUri: "spotify:track:b" }),
+			makeTrack({ trackUri: "spotify:track:c" }),
+		]);
+		store.tracks.value = store.tracks.value.map((t, i) => ({
+			...t,
+			candidates: i === 0 ? [makeCandidate(2, "spotify:track:r0")] : [],
+			searchStatus: "done" as const,
+		}));
+		return store;
+	}
+
+	it("selects all no-match tracks", () => {
+		const store = storeWithNoMatch();
+		selectAllNoMatchSection(store);
+
+		// Track a has candidates — should remain unchecked
+		expect(store.tracks.value[0]?.checked).toBe(false);
+		expect(store.tracks.value[1]?.checked).toBe(true);
+		expect(store.tracks.value[2]?.checked).toBe(true);
+	});
+
+	it("deselects all no-match tracks", () => {
+		const store = storeWithNoMatch();
+		selectAllNoMatchSection(store);
+		deselectAllNoMatchSection(store);
+
+		expect(store.tracks.value[1]?.checked).toBe(false);
+		expect(store.tracks.value[2]?.checked).toBe(false);
+	});
+
+	it("does not select applied no-match tracks", () => {
+		const store = storeWithNoMatch();
+		store.tracks.value = store.tracks.value.map((t, i) => (i === 1 ? { ...t, applied: true } : t));
+		selectAllNoMatchSection(store);
+
+		expect(store.tracks.value[1]?.checked).toBe(false);
+		expect(store.tracks.value[2]?.checked).toBe(true);
+	});
+
+	it("computes noMatchSelectAllState correctly", () => {
+		const store = storeWithNoMatch();
+		expect(store.noMatchSelectAllState.value).toBe("none");
+
+		toggleCheck(store, "spotify:track:b");
+		expect(store.noMatchSelectAllState.value).toBe("some");
+
+		toggleCheck(store, "spotify:track:c");
+		expect(store.noMatchSelectAllState.value).toBe("all");
 	});
 });
