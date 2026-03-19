@@ -12,18 +12,22 @@ The system SHALL fetch all of the user's saved tracks (Liked Songs) from the Spo
 - **THEN** the system paginates through 50 pages of results, fetching all tracks
 
 ### Requirement: Scan user-owned playlists
-The system SHALL fetch the user's playlists via `GET /me/playlists` before scanning begins, filtering to only playlists owned by the current user. The system SHALL emit a sources event listing all scan sources (Liked Songs followed by owned playlist names) before any track scanning occurs. For each owned playlist, the system SHALL then fetch all tracks via `GET /playlists/{id}/tracks` with `market=from_token`, paginating as needed.
+The system SHALL accept a scan configuration specifying whether to include Liked Songs and which playlists to scan. The scanner SHALL only scan the sources included in the configuration. The system SHALL emit a sources event listing only the selected scan sources before any track scanning occurs. Playlist fetching is no longer performed inside the scanner — the caller provides the playlist objects.
 
 #### Scenario: Sources event emitted before scanning
-- **WHEN** the user has 3 owned playlists ("Road Trip", "Chill Vibes", "Workout")
-- **THEN** the scanner emits a sources event with ["Liked Songs", "Road Trip", "Chill Vibes", "Workout"] before any track scanning begins
+- **WHEN** the scan configuration includes Liked Songs and 2 playlists ("Road Trip", "Chill Vibes")
+- **THEN** the scanner emits a sources event with ["Liked Songs", "Road Trip", "Chill Vibes"] before any track scanning begins
 
-#### Scenario: Scan owned playlists only
-- **WHEN** user owns 3 playlists and follows 5 playlists they don't own
-- **THEN** the system scans only the 3 owned playlists
+#### Scenario: Liked Songs excluded
+- **WHEN** the scan configuration has includeLikedSongs=false and 2 playlists
+- **THEN** the scanner does not fetch or scan Liked Songs, and the sources event lists only the 2 playlists
+
+#### Scenario: No playlists selected
+- **WHEN** the scan configuration has includeLikedSongs=true and an empty playlists array
+- **THEN** the scanner scans only Liked Songs and the sources event lists ["Liked Songs"]
 
 #### Scenario: Scan playlist with many tracks
-- **WHEN** a playlist contains 300 tracks
+- **WHEN** a selected playlist contains 300 tracks
 - **THEN** the system paginates through all 6 pages of results
 
 ### Requirement: Detect unplayable tracks
