@@ -1,143 +1,147 @@
 ## Requirements
 
 ### Requirement: Triage track list
-After scan completes, the system SHALL display all unplayable tracks in a two-section layout based on candidate availability. **Section 1: "Tracks with swap candidates (N)"** SHALL contain tracks with at least one candidate. **Section 2: "No swap found (N)"** SHALL contain tracks where search completed with zero candidates. Each section SHALL have its own header and select-all control. Within each section, tracks SHALL be listed in scan order (no sub-grouping by source). Each row SHALL display: a checkbox, album art thumbnail (40×40), track name, artist name(s) with source shown inline, restriction badge (color-coded by type: region / tier / explicit), and section-specific trailing content. Tracks whose search is still pending SHALL NOT appear in either section until their search completes — they remain in a pending/shimmer state.
+After scan completes, the system SHALL display all unplayable tracks as a flat list of cards. Each card SHALL contain a header section displaying the unplayable track (album art 44×44, track name, artist name(s), source tag, restriction badge color-coded by type: region / tier / explicit), followed by a body section containing clickable action rows. Tracks whose search is still pending SHALL NOT appear until their search completes. Cards SHALL appear in scan order. There SHALL be no section grouping, section headers, or select-all controls.
 
-#### Scenario: Display two-section triage layout
+#### Scenario: Display flat card list
 - **WHEN** scan completes and background search finds 7 tracks with candidates and 3 with no match
-- **THEN** Section 1 shows "Tracks with swap candidates (7)" with 7 rows, and Section 2 shows "No swap found (3)" with 3 rows
+- **THEN** 10 cards are displayed in a single flat list with no section headers or grouping
 
 #### Scenario: Track with no thumbnail
 - **WHEN** a track has no album art URL
-- **THEN** the row displays a neutral placeholder in the thumbnail position
+- **THEN** the card header displays a neutral placeholder in the thumbnail position
 
-#### Scenario: Pending tracks excluded from sections
-- **WHEN** background search has completed 15 of 20 tracks, with 10 having candidates and 5 having no match
-- **THEN** Section 1 shows 10 tracks, Section 2 shows 5 tracks, and 5 tracks are not yet visible in either section
+#### Scenario: Pending tracks excluded from list
+- **WHEN** background search has completed 15 of 20 tracks
+- **THEN** only 15 cards are displayed; 5 tracks are not yet visible
 
-#### Scenario: All tracks have candidates
-- **WHEN** every track has at least one candidate
-- **THEN** Section 2 ("No swap found") is not rendered
+### Requirement: Candidate action rows
+For tracks with candidates, the card body SHALL display one clickable row per candidate, sorted by confidence descending (highest first). Each candidate row SHALL display: candidate album art (32×32), candidate track name, candidate artist name(s). There SHALL be no confidence star ratings, RECOMMENDED badges, or other confidence indicators visible to the user. Clicking a candidate row SHALL set the track's intent to "replace" with that candidate selected, highlighting the row with a green border and displaying a green checkmark. Clicking an already-selected candidate row SHALL deselect it, setting the track's intent to "skip" and removing the highlight. Only one option per card can be selected at a time (radio behavior across candidates and the remove row).
 
-#### Scenario: All tracks have no match
-- **WHEN** every track has zero candidates
-- **THEN** Section 1 ("Tracks with swap candidates") is not rendered, and Section 2 is displayed prominently
+#### Scenario: Click candidate to select
+- **WHEN** user clicks a candidate row that is not selected
+- **THEN** the row highlights with a green border and checkmark, the track intent becomes "replace", and any previously selected option in that card is deselected
 
-### Requirement: Summary counters
-At the top of the triage view, the system SHALL display a row of live-updating summary counters: "N swapping" (tracks checked with candidates, styled green/positive), "N removing" (no-match tracks checked for removal, styled red/destructive), and "N no match" (total no-match tracks, neutral styling). Counters SHALL update immediately as the user interacts.
+#### Scenario: Click selected candidate to deselect
+- **WHEN** user clicks a candidate row that is already selected
+- **THEN** the highlight and checkmark are removed, and the track intent becomes "skip"
 
-#### Scenario: Summary counters reflect selections
-- **WHEN** 5 tracks with candidates are checked and 2 no-match tracks are checked for removal
-- **THEN** counters show "5 swapping · 2 removing · 3 no match" (assuming 3 total no-match tracks)
+#### Scenario: Switch between candidates
+- **WHEN** user clicks a different candidate row while one is already selected
+- **THEN** the previous candidate is deselected and the new one is selected
 
-#### Scenario: No selections
-- **WHEN** no tracks are checked
-- **THEN** counters show "0 swapping · 0 removing · N no match"
+#### Scenario: Candidate sort order
+- **WHEN** a track has candidates with confidence values 1, 3, and 2
+- **THEN** the candidates are displayed in order: confidence 3 (first), confidence 2, confidence 1 (last)
+
+### Requirement: Remove action row
+Every card SHALL include a "Remove from {source}" clickable row as the last option in the card body. The remove row SHALL have the same visual layout as candidate rows: a red ✕ icon in a tinted square (same size as candidate album art), a text label "Remove from {source}", and a red checkmark when selected. Clicking the remove row SHALL set the track's intent to "remove", highlighting the row with a red border. Clicking an already-selected remove row SHALL deselect it, setting intent to "skip". Selecting the remove row SHALL deselect any previously selected candidate, and vice versa. When a track's intent is "remove", the track name in the card header SHALL display with strikethrough styling and muted color.
+
+#### Scenario: Click remove row to select
+- **WHEN** user clicks the remove row on a card
+- **THEN** the row highlights with a red border and red checkmark, the track intent becomes "remove", and any selected candidate is deselected
+
+#### Scenario: Click remove row to deselect
+- **WHEN** user clicks an already-selected remove row
+- **THEN** the highlight is removed and the track intent becomes "skip"
+
+#### Scenario: Remove row deselects candidate
+- **WHEN** a candidate is selected and user clicks the remove row
+- **THEN** the candidate is deselected and the remove row becomes selected
+
+#### Scenario: Candidate deselects remove row
+- **WHEN** the remove row is selected and user clicks a candidate row
+- **THEN** the remove row is deselected and the candidate becomes selected
+
+#### Scenario: Remove row on card with no candidates
+- **WHEN** a track has no candidates
+- **THEN** the card body shows "No replacement candidates found." message followed by the remove row as the only action
+
+#### Scenario: Strikethrough on remove intent
+- **WHEN** a track's intent is "remove"
+- **THEN** the track name in the card header displays with strikethrough and muted color
 
 ### Requirement: Auto-proposal for high-confidence matches
-When a track has a ★★★ (confidence 3) candidate, the system SHALL auto-propose it: the checkbox SHALL be pre-checked, the best candidate SHALL be pre-selected, and "remove original" SHALL be pre-enabled. The row SHALL have a subtle visual distinction (e.g., tinted background or left border accent) to signal it is pre-handled. Tracks with only ★★ or ★ candidates SHALL have the checkbox unchecked and no candidate pre-selected. Tracks with no candidates SHALL have the checkbox unchecked (but enabled — they can be checked for removal in Section 2).
+When a track has a confidence-3 candidate (the highest), the system SHALL auto-select it on load: the best candidate row SHALL be highlighted (green border + checkmark) and the track intent SHALL be "replace". Tracks with only confidence 1 or 2 candidates SHALL default to intent "skip" with no candidate selected. Tracks with no candidates SHALL default to intent "skip". There SHALL be no visible confidence indicators — auto-proposal is invisible to the user except for the pre-selected state.
 
-#### Scenario: Track with 3-star candidate
-- **WHEN** background search finds a ★★★ candidate for a track
-- **THEN** the row is pre-checked with the best candidate selected, remove-original enabled, and a visual accent indicating auto-proposal
+#### Scenario: Track with confidence-3 candidate auto-selected
+- **WHEN** background search finds a confidence-3 candidate for a track
+- **THEN** the card loads with that candidate row highlighted and the track intent set to "replace"
 
-#### Scenario: Track with only 2-star candidates
-- **WHEN** the best candidate for a track is ★★
-- **THEN** the row checkbox is unchecked, no candidate is pre-selected, and the row appears neutral
+#### Scenario: Track with only confidence-2 candidates
+- **WHEN** the best candidate for a track has confidence 2
+- **THEN** the card loads with no candidate selected and intent "skip"
 
 #### Scenario: Track with no candidates
 - **WHEN** background search finds no candidates for a track
-- **THEN** the track appears in Section 2 with checkbox unchecked and enabled, and inline text shows "No match found" in muted/italic style
+- **THEN** the card loads with intent "skip" and only the remove row available
 
-### Requirement: No-match track removal
-Tracks in Section 2 ("No swap found") SHALL have their checkbox enabled. Checking a no-match track SHALL mark it for removal. When checked, the row SHALL display a red/destructive checkbox color, a subtle destructive-tinted background, and strikethrough styling on the track name. Unchecking SHALL remove the removal mark and restore normal styling.
+### Requirement: Triage track state
+Each track SHALL maintain state as: `intent` (enum: "skip" | "replace" | "remove") and `selectedCandidateId` (string or null). When `intent` is "replace", `selectedCandidateId` SHALL reference the chosen candidate. When `intent` is "skip" or "remove", `selectedCandidateId` MAY retain a previous value to allow re-selection if the user re-activates the track. There SHALL be no `removeOriginal` field — a "replace" intent always implies removal of the original. There SHALL be no `checked` boolean — intent "skip" is equivalent to unchecked.
 
-#### Scenario: Check no-match track for removal
-- **WHEN** user checks a track in the "No swap found" section
-- **THEN** the checkbox turns red, the row gets a destructive tint, and the track name shows strikethrough
+#### Scenario: Replace intent state
+- **WHEN** user selects a candidate
+- **THEN** state is `{ intent: 'replace', selectedCandidateId: '<uri>' }`
 
-#### Scenario: Uncheck no-match track
-- **WHEN** user unchecks a previously checked no-match track
-- **THEN** the checkbox, background, and track name revert to normal styling
+#### Scenario: Remove intent state
+- **WHEN** user selects the remove row
+- **THEN** state is `{ intent: 'remove', selectedCandidateId: null }` (or a previously retained value)
 
-### Requirement: Checkbox color differentiation
-Checkboxes in Section 1 (swap candidates) SHALL use green/accent color when checked. Checkboxes in Section 2 (no swap found) SHALL use red/destructive color when checked. Unchecked checkboxes in both sections SHALL use the same neutral border style.
+#### Scenario: Skip intent state
+- **WHEN** user deselects any active option
+- **THEN** state is `{ intent: 'skip' }` with `selectedCandidateId` optionally retained
 
-#### Scenario: Swap section checked checkbox
-- **WHEN** a track with candidates is checked
-- **THEN** the checkbox displays with green/accent fill
+#### Scenario: Re-selecting after skip retains previous candidate
+- **WHEN** user selects candidate A, deselects (skip), then clicks the checkbox area or re-engages
+- **THEN** candidate A can be re-selected without the system resetting to a different candidate
 
-#### Scenario: Removal section checked checkbox
-- **WHEN** a no-match track is checked for removal
-- **THEN** the checkbox displays with red/destructive fill
+### Requirement: Pending operations generation
+The system SHALL generate pending operations from track state as follows: when `intent` is "replace", generate both an `add` operation (with the selected candidate URI) and a `remove` operation (for the original track). When `intent` is "remove", generate only a `remove` operation. When `intent` is "skip", generate no operations. There SHALL be no "addition-only" path — every replace generates both add and remove.
 
-### Requirement: Row expansion for candidate selection
-Clicking a track row SHALL expand an inline panel below it (accordion style — only one expanded at a time). The expansion panel SHALL display a section header ("Candidates for {track name}"), each candidate as a sub-row with: album art (36×36) linked to the album's Spotify page, candidate name linked to the track's Spotify page + artist name(s) each individually linked to their Spotify artist page, star rating, a "Recommended" badge on ★★★ candidates, and a radio-style selection indicator. Below the candidates SHALL be a "Remove original from {source}" toggle. Clicking a candidate SHALL select it and check the parent row. If a track has no candidates, the expansion panel SHALL show "No replacement candidates found for this track." All Spotify links SHALL open in a new tab and SHALL NOT interfere with candidate radio-selection behavior.
+#### Scenario: Replace intent generates add + remove
+- **WHEN** a track has intent "replace" with a selected candidate
+- **THEN** pendingOps includes one "add" op with the candidate URI and one "remove" op for the original track
 
-#### Scenario: Expand a track with candidates
-- **WHEN** user clicks a track row that has 3 candidates
-- **THEN** an inline panel expands below showing all 3 candidates with selection controls and a remove-original toggle
+#### Scenario: Remove intent generates remove only
+- **WHEN** a track has intent "remove"
+- **THEN** pendingOps includes one "remove" op for the original track and no "add" op
 
-#### Scenario: Select a candidate from expansion
-- **WHEN** user clicks a candidate in the expansion panel
-- **THEN** that candidate becomes selected (radio behavior), and the parent row's checkbox becomes checked
+#### Scenario: Skip intent generates nothing
+- **WHEN** a track has intent "skip"
+- **THEN** pendingOps includes no operations for that track
 
-#### Scenario: Only one row expanded at a time
-- **WHEN** user clicks a different track row while one is already expanded
-- **THEN** the previously expanded row collapses and the clicked row expands
+### Requirement: Apply bar
+A fixed bottom bar SHALL appear (slide up) whenever at least one track has intent "replace" or "remove". The bar SHALL display a summary using two categories: "Replacing N" (tracks with intent "replace") and "removing N" (tracks with intent "remove"), joined with ", ". The "Apply Changes" button SHALL be disabled while background search is in progress. The bar SHALL disappear (slide down) when no tracks have an active intent.
 
-#### Scenario: Expand track with no candidates
-- **WHEN** user expands a track that has no replacement candidates
-- **THEN** the expansion panel shows "No replacement candidates found for this track."
+#### Scenario: Apply bar with replacements and removals
+- **WHEN** 3 tracks have intent "replace" and 2 tracks have intent "remove"
+- **THEN** the apply bar shows "Replacing 3, removing 2"
 
-#### Scenario: Click candidate track name link
-- **WHEN** user clicks the candidate track name in an expansion panel
-- **THEN** a new browser tab opens to `https://open.spotify.com/track/{trackId}` and the candidate radio selection is NOT triggered
+#### Scenario: Apply bar with only replacements
+- **WHEN** 4 tracks have intent "replace" and none have intent "remove"
+- **THEN** the apply bar shows "Replacing 4"
 
-#### Scenario: Click candidate artist name link
-- **WHEN** user clicks an individual artist name in a candidate row
-- **THEN** a new browser tab opens to `https://open.spotify.com/artist/{artistId}` and the candidate radio selection is NOT triggered
+#### Scenario: Apply bar disabled during search
+- **WHEN** background search is still running and tracks have active intents
+- **THEN** the apply bar is visible but "Apply Changes" is disabled
 
-#### Scenario: Click candidate album art link
-- **WHEN** user clicks the album art thumbnail in a candidate row
-- **THEN** a new browser tab opens to `https://open.spotify.com/album/{albumId}` and the candidate radio selection is NOT triggered
+#### Scenario: Apply bar disappears
+- **WHEN** all tracks have intent "skip"
+- **THEN** the apply bar slides down and disappears
 
-### Requirement: Filter bar
-Above the track list, the system SHALL display a horizontal bar of filter chips: "All (N)", "★★★ Auto-proposed (N)", "★★ Needs review (N)", and "No match (N)" where N is the count of tracks in each category. Filters SHALL be mutually exclusive (radio behavior). Selecting a filter SHALL instantly filter the visible list, collapse any expanded row, and hide entire sections when irrelevant (e.g., "No match" filter hides the swap section). The filter bar SHALL also show a running count of total selected (checked) tracks on the right side.
+### Requirement: Confirmation modal
+Clicking "Apply Changes" SHALL open a modal titled "Review Changes" listing pending operations grouped as: **REPLACE items** (each showing a green REPLACE badge, the candidate name, and destination source) followed by **REMOVE items** (each showing a red REMOVE badge, the original track name, and source). The subtitle SHALL show the same summary as the apply bar. Footer SHALL contain "Cancel" and "Apply N changes" buttons.
 
-#### Scenario: Filter to auto-proposed
-- **WHEN** user clicks the "★★★ Auto-proposed" filter chip
-- **THEN** only tracks with a ★★★ best candidate are shown, any expanded row collapses, and counts update
+#### Scenario: Review modal with replacements and removals
+- **WHEN** user clicks "Apply Changes" with 3 replacements and 2 removals
+- **THEN** modal shows 3 items with green REPLACE badge followed by 2 items with red REMOVE badge, subtitle "Replacing 3, removing 2", and "Apply 8 changes" button (counting individual ops)
 
-#### Scenario: Filter counts reflect search results
-- **WHEN** background search completes with 15 tracks: 8 with ★★★, 4 with ★★, 3 with no match
-- **THEN** filter chips show: All (15), ★★★ Auto-proposed (8), ★★ Needs review (4), No match (3)
-
-#### Scenario: Selected count in filter bar
-- **WHEN** 5 tracks are checked across all categories
-- **THEN** the filter bar right side shows "5 selected"
-
-### Requirement: Select all control
-Each section SHALL have its own select-all control directly below the section header. Section 1's select-all SHALL be labeled "Select all with candidates" and SHALL check all tracks in Section 1, auto-selecting their best candidate. Section 2's select-all SHALL be labeled "Select all for removal" and SHALL check all tracks in Section 2 for removal. Both SHALL show tri-state behavior: unchecked (none), partial (some), fully checked (all). Toggling off SHALL uncheck all tracks in that section. The global select-all in the filter bar is removed.
-
-#### Scenario: Select all in swap section
-- **WHEN** user clicks "Select all with candidates" in Section 1
-- **THEN** all tracks in Section 1 become checked with their best candidate selected
-
-#### Scenario: Select all for removal
-- **WHEN** user clicks "Select all for removal" in Section 2
-- **THEN** all tracks in Section 2 become checked for removal with red checkboxes and strikethrough styling
-
-#### Scenario: Deselect all in a section
-- **WHEN** user clicks a fully-checked section select-all
-- **THEN** all tracks in that section become unchecked
-
-#### Scenario: Tri-state partial in section
-- **WHEN** 3 of 8 tracks in Section 1 are checked
-- **THEN** Section 1's select-all shows partial/indeterminate state
+#### Scenario: Cancel review
+- **WHEN** user clicks "Cancel"
+- **THEN** the modal closes with no changes
 
 ### Requirement: Background search progress indicator
-While the background replacement search is running, the system SHALL display a persistent progress indicator at the top of the triage view showing "Finding swaps: X/Y" with a subtle animated indicator. When the search completes, it SHALL show "Swap search complete — Y/Y tracks scanned" as a static indicator. Tracks whose search is still pending SHALL show a loading/shimmer state on the confidence indicator.
+While the background replacement search is running, the system SHALL display a persistent progress indicator at the top of the triage view showing "Finding swaps: X/Y" with animation. When complete, it SHALL show "Swap search complete — Y/Y tracks scanned" as static text.
 
 #### Scenario: Search in progress
 - **WHEN** background search has completed 12 of 28 tracks
@@ -145,83 +149,26 @@ While the background replacement search is running, the system SHALL display a p
 
 #### Scenario: Search complete
 - **WHEN** all 28 tracks have been searched
-- **THEN** the progress indicator shows "Swap search complete — 28/28 tracks scanned" without animation
-
-#### Scenario: Pending track loading state
-- **WHEN** a track's search has not yet completed
-- **THEN** the track row shows a subtle shimmer/loading state on the confidence indicator and candidate preview area
-
-### Requirement: Apply bar
-A fixed bottom bar SHALL appear (slide up) whenever at least one action is pending — either a swap selection, an original removal, or a no-match removal. The bar SHALL display a summary using track-level intent labels — "N swaps" (replacement selected + remove original), "N additions" (replacement selected, keep original), "N removals" (remove only OR no-match marked for removal) — joined with " + ". An "Apply Changes" primary action button appears alongside. The "Apply Changes" button SHALL be disabled (visually muted, non-clickable) while the background swap search is still in progress, to prevent applying before all tracks have been searched. The bar SHALL disappear (slide down) when no changes are pending.
-
-#### Scenario: Apply bar with swaps and removals
-- **WHEN** 3 tracks are checked with candidates and remove-original on, and 2 no-match tracks are checked for removal
-- **THEN** the apply bar shows "3 swaps + 2 removals"
-
-#### Scenario: Apply bar with mixed actions
-- **WHEN** 2 tracks have candidates with remove-original on (swaps), 1 track has candidate without remove-original (addition), and 3 no-match tracks are checked for removal
-- **THEN** the apply bar shows "2 swaps + 1 addition + 3 removals"
-
-#### Scenario: Apply button disabled during search
-- **WHEN** the background swap search is still running and tracks are checked
-- **THEN** the apply bar is visible with the summary, but "Apply Changes" is disabled (muted styling, not clickable)
-
-#### Scenario: Apply button enabled after search
-- **WHEN** the background swap search completes
-- **THEN** the "Apply Changes" button becomes enabled
-
-#### Scenario: Apply bar disappears
-- **WHEN** user unchecks all tracks in both sections
-- **THEN** the apply bar slides down and disappears
-
-### Requirement: Confirmation modal
-Clicking "Apply Changes" SHALL open a modal overlay titled "Review Changes" with a subtitle showing the summary (e.g., "3 swaps + 2 removals") and a warning that changes will modify the Spotify library. The modal SHALL contain a scrollable list of pending operations, grouped by type: **SWAP items first** (each showing a green SWAP badge, the candidate name, destination source, and confidence stars — representing both the add and removal of the original as one atomic item), followed by a separator, then **RMV items** (each showing a red RMV badge, the track name, and source). Footer SHALL contain "Cancel" (closes modal) and "Apply N changes" (triggers batch execution).
-
-#### Scenario: Review modal with swaps and removals
-- **WHEN** user clicks "Apply Changes" with 3 swaps and 2 removals
-- **THEN** modal shows "Review Changes" with subtitle "3 swaps + 2 removals", lists 3 SWAP items (green badges) followed by 2 RMV items (red badges), and has Cancel + "Apply 5 changes" buttons
-
-#### Scenario: Cancel review
-- **WHEN** user clicks "Cancel" in the review modal
-- **THEN** the modal closes and the triage view is unchanged
-
-### Requirement: Triage track state
-Each track SHALL maintain independent state: `checked` (boolean, included in batch — for swap OR removal depending on section), `selectedCandidateId` (string or null), and `removeOriginal` (boolean). For tracks with candidates: checking SHALL auto-select the best candidate if none is selected; unchecking SHALL clear the candidate selection; `removeOriginal` defaults to true for ★★★ tracks. For no-match tracks: `checked` means marked for removal; `selectedCandidateId` and `removeOriginal` are unused.
-
-#### Scenario: Check a track with candidates auto-selects best candidate
-- **WHEN** user checks a track in Section 1 that has candidates but none selected
-- **THEN** the best (highest confidence) candidate is automatically selected
-
-#### Scenario: Uncheck clears selection
-- **WHEN** user unchecks a checked track in Section 1
-- **THEN** the selected candidate is cleared (set to null)
-
-#### Scenario: Auto-proposal defaults
-- **WHEN** background search finds a ★★★ candidate
-- **THEN** the track state is initialized with checked=true, selectedCandidateId=best candidate, removeOriginal=true
-
-#### Scenario: Check no-match track
-- **WHEN** user checks a track in Section 2 (no candidates)
-- **THEN** the track is marked for removal; selectedCandidateId remains null
+- **THEN** the indicator shows "Swap search complete — 28/28 tracks scanned"
 
 ### Requirement: Apply progress view
-After confirming in the review modal, the modal content SHALL transition to a progress view showing a centered spinner, progress text ("Applying... X/Y"), and a progress bar. Swap operations execute first (add candidate + remove original per track), then standalone removals. When all operations complete, the view SHALL transition to a completion state showing a checkmark, "All changes applied!", breakdown counts ("N swaps, N removals"), and a "Done" button.
+After confirming in the review modal, the modal SHALL transition to a progress view with spinner, "Applying... X/Y", and progress bar. On completion, it SHALL show a checkmark, "All changes applied!", and a "Done" button. On partial failure, it SHALL show succeeded/failed counts, failed items, and a "Retry" option.
 
 #### Scenario: Apply in progress
-- **WHEN** batch apply is executing and 3 of 8 operations are complete
-- **THEN** the modal shows a spinner, "Applying... 3/8", and a progress bar
+- **WHEN** 3 of 8 operations are complete
+- **THEN** modal shows spinner, "Applying... 3/8", and progress bar
 
 #### Scenario: Apply complete
-- **WHEN** all operations complete successfully with 3 swaps and 2 removals
-- **THEN** the modal shows a checkmark, "All changes applied!", "3 swaps, 2 removals", and a "Done" button
+- **WHEN** all operations succeed
+- **THEN** modal shows checkmark, "All changes applied!", and "Done" button
 
 #### Scenario: Partial failure
 - **WHEN** 4 of 6 operations succeed and 2 fail
-- **THEN** the modal shows "4/6 changes applied. 2 failed." with the failed items listed and a "Retry" option
+- **THEN** modal shows "4/6 changes applied. 2 failed." with failed items and "Retry"
 
 #### Scenario: Done closes modal and dims applied tracks
-- **WHEN** user clicks "Done" after apply completes
-- **THEN** the modal closes and applied tracks are dimmed (reduced opacity, non-interactive) in the triage list
+- **WHEN** user clicks "Done"
+- **THEN** modal closes and applied tracks are dimmed (reduced opacity, non-interactive)
 
 ### Requirement: Mini player Spotify links
 The mini player SHALL display the currently playing track's name as a link to the track's Spotify page, each artist name as an individual link to the artist's Spotify page, and the album art as a link to the album's Spotify page. All links SHALL open in a new tab.
@@ -232,7 +179,7 @@ The mini player SHALL display the currently playing track's name as a link to th
 
 #### Scenario: Click artist name in mini player
 - **WHEN** the mini player shows "Artist A, Artist B" and user clicks "Artist B"
-- **THEN** a new browser tab opens to `https://open.spotify.com/artist/{artistBId}` (only that artist)
+- **THEN** a new browser tab opens to `https://open.spotify.com/artist/{artistBId}`
 
 #### Scenario: Click album art in mini player
 - **WHEN** user clicks the album art in the mini player

@@ -2,19 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { ReplacementCandidate, UnplayableTrack } from "../types";
 import {
 	createTriageStore,
-	deselectAllNoMatchSection,
-	deselectAllSwapSection,
-	deselectAllVisible,
 	markTracksApplied,
 	searchAllReplacements,
-	selectAllNoMatchSection,
-	selectAllSwapSection,
-	selectAllVisible,
 	selectCandidate,
-	setFilter,
-	toggleCheck,
-	toggleExpanded,
-	toggleRemoveOriginal,
+	toggleRemove,
 } from "./state";
 
 // --- Helpers ---
@@ -55,7 +46,7 @@ describe("createTriageStore", () => {
 		const store = createTriageStore([makeTrack(), makeTrack({ trackUri: "spotify:track:def456" })]);
 
 		expect(store.tracks.value).toHaveLength(2);
-		expect(store.tracks.value[0]?.checked).toBe(false);
+		expect(store.tracks.value[0]?.intent).toBe("skip");
 		expect(store.tracks.value[0]?.searchStatus).toBe("pending");
 		expect(store.tracks.value[0]?.candidates).toEqual([]);
 		expect(store.tracks.value[0]?.applied).toBe(false);
@@ -66,97 +57,21 @@ describe("createTriageStore", () => {
 		expect(store.searchProgress.value).toEqual({ completed: 0, total: 2 });
 	});
 
-	it("computes filter counts", () => {
-		const store = createTriageStore([makeTrack()]);
-		expect(store.counts.value).toEqual({
-			all: 1,
-			autoProposed: 0,
-			needsReview: 0,
-			noMatch: 0,
-		});
-	});
-
 	it("starts with no pending ops", () => {
 		const store = createTriageStore([makeTrack()]);
 		expect(store.pendingOps.value).toEqual([]);
 	});
 
-	it("starts with selectAllState none", () => {
+	it("starts with selectedCount 0", () => {
 		const store = createTriageStore([makeTrack()]);
-		expect(store.selectAllState.value).toBe("none");
-	});
-});
-
-// --- toggleCheck ---
-
-describe("toggleCheck", () => {
-	it("checks a track and auto-selects best candidate", () => {
-		const store = createTriageStore([makeTrack()]);
-		const c3 = makeCandidate(3, "spotify:track:c3");
-		const c1 = makeCandidate(1, "spotify:track:c1");
-		// Manually set candidates (simulating search completion)
-		store.tracks.value = store.tracks.value.map((t) => ({
-			...t,
-			candidates: [c3, c1],
-			searchStatus: "done" as const,
-		}));
-
-		toggleCheck(store, "spotify:track:abc123");
-
-		const track = store.tracks.value[0];
-		expect(track?.checked).toBe(true);
-		expect(track?.selectedCandidateId).toBe("spotify:track:c3");
-		// confidence 3 → auto-set removeOriginal
-		expect(track?.removeOriginal).toBe(true);
-	});
-
-	it("unchecking clears selection and removeOriginal", () => {
-		const store = createTriageStore([makeTrack()]);
-		store.tracks.value = store.tracks.value.map((t) => ({
-			...t,
-			checked: true,
-			selectedCandidateId: "spotify:track:x",
-			removeOriginal: true,
-			candidates: [makeCandidate(3)],
-			searchStatus: "done" as const,
-		}));
-
-		toggleCheck(store, "spotify:track:abc123");
-
-		const track = store.tracks.value[0];
-		expect(track?.checked).toBe(false);
-		expect(track?.selectedCandidateId).toBeNull();
-		expect(track?.removeOriginal).toBe(false);
-	});
-
-	it("does not toggle applied tracks", () => {
-		const store = createTriageStore([makeTrack()]);
-		store.tracks.value = store.tracks.value.map((t) => ({
-			...t,
-			applied: true,
-		}));
-
-		toggleCheck(store, "spotify:track:abc123");
-		expect(store.tracks.value[0]?.checked).toBe(false);
-	});
-
-	it("does not auto-set removeOriginal for low confidence", () => {
-		const store = createTriageStore([makeTrack()]);
-		store.tracks.value = store.tracks.value.map((t) => ({
-			...t,
-			candidates: [makeCandidate(2)],
-			searchStatus: "done" as const,
-		}));
-
-		toggleCheck(store, "spotify:track:abc123");
-		expect(store.tracks.value[0]?.removeOriginal).toBe(false);
+		expect(store.selectedCount.value).toBe(0);
 	});
 });
 
 // --- selectCandidate ---
 
 describe("selectCandidate", () => {
-	it("selects a candidate and checks the track", () => {
+	it("sets intent to replace with candidate", () => {
 		const store = createTriageStore([makeTrack()]);
 		store.tracks.value = store.tracks.value.map((t) => ({
 			...t,
@@ -167,206 +82,154 @@ describe("selectCandidate", () => {
 		selectCandidate(store, "spotify:track:abc123", "spotify:track:c2");
 
 		const track = store.tracks.value[0];
-		expect(track?.checked).toBe(true);
+		expect(track?.intent).toBe("replace");
 		expect(track?.selectedCandidateId).toBe("spotify:track:c2");
 	});
+
+	it("toggles to skip when same candidate re-clicked", () => {
+		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			candidates: [makeCandidate(2, "spotify:track:c2")],
+			searchStatus: "done" as const,
+			intent: "replace" as const,
+			selectedCandidateId: "spotify:track:c2",
+		}));
+
+		selectCandidate(store, "spotify:track:abc123", "spotify:track:c2");
+
+		expect(store.tracks.value[0]?.intent).toBe("skip");
+	});
+
+	it("switches candidate when different one clicked", () => {
+		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			candidates: [makeCandidate(3, "spotify:track:c3"), makeCandidate(1, "spotify:track:c1")],
+			searchStatus: "done" as const,
+			intent: "replace" as const,
+			selectedCandidateId: "spotify:track:c3",
+		}));
+
+		selectCandidate(store, "spotify:track:abc123", "spotify:track:c1");
+
+		const track = store.tracks.value[0];
+		expect(track?.intent).toBe("replace");
+		expect(track?.selectedCandidateId).toBe("spotify:track:c1");
+	});
+
+	it("does not modify applied tracks", () => {
+		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({ ...t, applied: true }));
+
+		selectCandidate(store, "spotify:track:abc123", "spotify:track:c2");
+		expect(store.tracks.value[0]?.intent).toBe("skip");
+	});
+
+	it("deselects remove row when candidate selected", () => {
+		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			candidates: [makeCandidate(2, "spotify:track:c2")],
+			searchStatus: "done" as const,
+			intent: "remove" as const,
+		}));
+
+		selectCandidate(store, "spotify:track:abc123", "spotify:track:c2");
+
+		expect(store.tracks.value[0]?.intent).toBe("replace");
+	});
 });
 
-// --- toggleRemoveOriginal ---
+// --- toggleRemove ---
 
-describe("toggleRemoveOriginal", () => {
-	it("toggles removeOriginal flag", () => {
+describe("toggleRemove", () => {
+	it("sets intent to remove", () => {
 		const store = createTriageStore([makeTrack()]);
 
-		toggleRemoveOriginal(store, "spotify:track:abc123");
-		expect(store.tracks.value[0]?.removeOriginal).toBe(true);
-
-		toggleRemoveOriginal(store, "spotify:track:abc123");
-		expect(store.tracks.value[0]?.removeOriginal).toBe(false);
+		toggleRemove(store, "spotify:track:abc123");
+		expect(store.tracks.value[0]?.intent).toBe("remove");
 	});
-});
 
-// --- setFilter ---
-
-describe("setFilter", () => {
-	it("updates filter and clears expanded track", () => {
+	it("toggles back to skip", () => {
 		const store = createTriageStore([makeTrack()]);
-		store.expandedTrackId.value = "spotify:track:abc123";
-
-		setFilter(store, "no-match");
-
-		expect(store.filter.value).toBe("no-match");
-		expect(store.expandedTrackId.value).toBeNull();
-	});
-});
-
-// --- filteredTracks ---
-
-describe("filteredTracks", () => {
-	it("filters by auto-proposed (confidence 3)", () => {
-		const store = createTriageStore([
-			makeTrack({ trackUri: "spotify:track:a" }),
-			makeTrack({ trackUri: "spotify:track:b" }),
-		]);
-		store.tracks.value = store.tracks.value.map((t, i) => ({
+		store.tracks.value = store.tracks.value.map((t) => ({
 			...t,
-			candidates: i === 0 ? [makeCandidate(3)] : [makeCandidate(1)],
-			searchStatus: "done" as const,
+			intent: "remove" as const,
 		}));
 
-		setFilter(store, "auto-proposed");
-		expect(store.filteredTracks.value).toHaveLength(1);
-		expect(store.filteredTracks.value[0]?.id).toBe("spotify:track:a");
+		toggleRemove(store, "spotify:track:abc123");
+		expect(store.tracks.value[0]?.intent).toBe("skip");
 	});
 
-	it("filters by needs-review (confidence 1-2)", () => {
-		const store = createTriageStore([
-			makeTrack({ trackUri: "spotify:track:a" }),
-			makeTrack({ trackUri: "spotify:track:b" }),
-		]);
-		store.tracks.value = store.tracks.value.map((t, i) => ({
-			...t,
-			candidates: i === 0 ? [makeCandidate(3)] : [makeCandidate(2)],
-			searchStatus: "done" as const,
-		}));
-
-		setFilter(store, "needs-review");
-		expect(store.filteredTracks.value).toHaveLength(1);
-		expect(store.filteredTracks.value[0]?.id).toBe("spotify:track:b");
-	});
-
-	it("filters by no-match", () => {
-		const store = createTriageStore([
-			makeTrack({ trackUri: "spotify:track:a" }),
-			makeTrack({ trackUri: "spotify:track:b" }),
-		]);
-		store.tracks.value = store.tracks.value.map((t, i) => ({
-			...t,
-			candidates: i === 0 ? [makeCandidate(2)] : [],
-			searchStatus: "done" as const,
-		}));
-
-		setFilter(store, "no-match");
-		expect(store.filteredTracks.value).toHaveLength(1);
-		expect(store.filteredTracks.value[0]?.id).toBe("spotify:track:b");
-	});
-});
-
-// --- selectAllVisible / deselectAllVisible ---
-
-describe("selectAllVisible / deselectAllVisible", () => {
-	function storeWithCandidates() {
-		const store = createTriageStore([
-			makeTrack({ trackUri: "spotify:track:a" }),
-			makeTrack({ trackUri: "spotify:track:b" }),
-			makeTrack({ trackUri: "spotify:track:c" }),
-		]);
-		store.tracks.value = store.tracks.value.map((t, i) => ({
-			...t,
-			candidates: i < 2 ? [makeCandidate(3, `spotify:track:r${i}`)] : [],
-			searchStatus: "done" as const,
-		}));
-		return store;
-	}
-
-	it("selects all visible tracks with candidates", () => {
-		const store = storeWithCandidates();
-
-		selectAllVisible(store);
-
-		expect(store.tracks.value[0]?.checked).toBe(true);
-		expect(store.tracks.value[1]?.checked).toBe(true);
-		// Track c has no candidates — should stay unchecked
-		expect(store.tracks.value[2]?.checked).toBe(false);
-	});
-
-	it("does not select applied tracks", () => {
-		const store = storeWithCandidates();
-		store.tracks.value = store.tracks.value.map((t, i) => (i === 0 ? { ...t, applied: true } : t));
-
-		selectAllVisible(store);
-
-		expect(store.tracks.value[0]?.checked).toBe(false);
-		expect(store.tracks.value[1]?.checked).toBe(true);
-	});
-
-	it("deselects all visible tracks", () => {
-		const store = storeWithCandidates();
-		selectAllVisible(store);
-
-		deselectAllVisible(store);
-
-		expect(store.tracks.value[0]?.checked).toBe(false);
-		expect(store.tracks.value[1]?.checked).toBe(false);
-	});
-
-	it("computes selectAllState correctly", () => {
-		const store = storeWithCandidates();
-
-		expect(store.selectAllState.value).toBe("none");
-
-		toggleCheck(store, "spotify:track:a");
-		expect(store.selectAllState.value).toBe("some");
-
-		toggleCheck(store, "spotify:track:b");
-		expect(store.selectAllState.value).toBe("all");
-	});
-});
-
-// --- toggleExpanded ---
-
-describe("toggleExpanded", () => {
-	it("expands and collapses", () => {
+	it("deselects candidate when remove toggled on", () => {
 		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			candidates: [makeCandidate(3, "spotify:track:c3")],
+			searchStatus: "done" as const,
+			intent: "replace" as const,
+			selectedCandidateId: "spotify:track:c3",
+		}));
 
-		toggleExpanded(store, "spotify:track:abc123");
-		expect(store.expandedTrackId.value).toBe("spotify:track:abc123");
+		toggleRemove(store, "spotify:track:abc123");
 
-		toggleExpanded(store, "spotify:track:abc123");
-		expect(store.expandedTrackId.value).toBeNull();
+		const track = store.tracks.value[0];
+		expect(track?.intent).toBe("remove");
+		expect(track?.selectedCandidateId).toBeNull();
+	});
+
+	it("does not modify applied tracks", () => {
+		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({ ...t, applied: true }));
+
+		toggleRemove(store, "spotify:track:abc123");
+		expect(store.tracks.value[0]?.intent).toBe("skip");
 	});
 });
 
 // --- pendingOps ---
 
 describe("pendingOps", () => {
-	it("generates add op for checked track with candidate", () => {
-		const store = createTriageStore([makeTrack()]);
-		const candidate = makeCandidate(3, "spotify:track:rep");
-		store.tracks.value = store.tracks.value.map((t) => ({
-			...t,
-			candidates: [candidate],
-			searchStatus: "done" as const,
-		}));
-
-		toggleCheck(store, "spotify:track:abc123");
-
-		const ops = store.pendingOps.value;
-		const addOp = ops.find((o) => o.type === "add");
-		expect(addOp).toBeDefined();
-		expect(addOp?.candidateUri).toBe("spotify:track:rep");
-	});
-
-	it("generates remove op when removeOriginal is set", () => {
+	it("generates add + remove for replace intent", () => {
 		const store = createTriageStore([makeTrack()]);
 		store.tracks.value = store.tracks.value.map((t) => ({
 			...t,
-			candidates: [makeCandidate(3)],
+			candidates: [makeCandidate(3, "spotify:track:rep")],
 			searchStatus: "done" as const,
+			intent: "replace" as const,
+			selectedCandidateId: "spotify:track:rep",
 		}));
 
-		toggleCheck(store, "spotify:track:abc123");
-		// confidence 3 auto-sets removeOriginal, so we should have both add and remove
 		const ops = store.pendingOps.value;
-		expect(ops.find((o) => o.type === "add")).toBeDefined();
+		expect(ops).toHaveLength(2);
+		expect(ops.find((o) => o.type === "add")?.candidateUri).toBe("spotify:track:rep");
 		expect(ops.find((o) => o.type === "remove")).toBeDefined();
 	});
 
-	it("excludes applied tracks from pending ops", () => {
+	it("generates remove only for remove intent", () => {
 		const store = createTriageStore([makeTrack()]);
 		store.tracks.value = store.tracks.value.map((t) => ({
 			...t,
-			checked: true,
+			searchStatus: "done" as const,
+			intent: "remove" as const,
+		}));
+
+		const ops = store.pendingOps.value;
+		expect(ops).toHaveLength(1);
+		expect(ops[0]?.type).toBe("remove");
+	});
+
+	it("generates nothing for skip intent", () => {
+		const store = createTriageStore([makeTrack()]);
+		expect(store.pendingOps.value).toEqual([]);
+	});
+
+	it("excludes applied tracks", () => {
+		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			intent: "replace" as const,
 			selectedCandidateId: "spotify:track:x",
 			candidates: [makeCandidate(3)],
 			searchStatus: "done" as const,
@@ -377,22 +240,58 @@ describe("pendingOps", () => {
 	});
 });
 
+// --- selectedCount ---
+
+describe("selectedCount", () => {
+	it("counts tracks with non-skip intent", () => {
+		const store = createTriageStore([
+			makeTrack({ trackUri: "spotify:track:a" }),
+			makeTrack({ trackUri: "spotify:track:b" }),
+			makeTrack({ trackUri: "spotify:track:c" }),
+		]);
+		store.tracks.value = store.tracks.value.map((t, i) => ({
+			...t,
+			intent: i === 0 ? ("replace" as const) : i === 1 ? ("remove" as const) : ("skip" as const),
+			selectedCandidateId: i === 0 ? "spotify:track:x" : null,
+			searchStatus: "done" as const,
+		}));
+
+		expect(store.selectedCount.value).toBe(2);
+	});
+
+	it("excludes applied tracks", () => {
+		const store = createTriageStore([makeTrack()]);
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			intent: "replace" as const,
+			selectedCandidateId: "spotify:track:x",
+			applied: true,
+		}));
+
+		expect(store.selectedCount.value).toBe(0);
+	});
+});
+
 // --- markTracksApplied ---
 
 describe("markTracksApplied", () => {
-	it("marks specified tracks as applied and unchecked", () => {
+	it("marks specified tracks as applied with skip intent", () => {
 		const store = createTriageStore([
 			makeTrack({ trackUri: "spotify:track:a" }),
 			makeTrack({ trackUri: "spotify:track:b" }),
 		]);
-		store.tracks.value = store.tracks.value.map((t) => ({ ...t, checked: true }));
+		store.tracks.value = store.tracks.value.map((t) => ({
+			...t,
+			intent: "replace" as const,
+			selectedCandidateId: "spotify:track:x",
+		}));
 
 		markTracksApplied(store, ["spotify:track:a"]);
 
 		expect(store.tracks.value[0]?.applied).toBe(true);
-		expect(store.tracks.value[0]?.checked).toBe(false);
+		expect(store.tracks.value[0]?.intent).toBe("skip");
 		expect(store.tracks.value[1]?.applied).toBe(false);
-		expect(store.tracks.value[1]?.checked).toBe(true);
+		expect(store.tracks.value[1]?.intent).toBe("replace");
 	});
 });
 
@@ -424,9 +323,8 @@ describe("searchAllReplacements", () => {
 		await searchAllReplacements(store, searchFn);
 
 		const track = store.tracks.value[0];
-		expect(track?.checked).toBe(true);
+		expect(track?.intent).toBe("replace");
 		expect(track?.selectedCandidateId).toBe("spotify:track:c3");
-		expect(track?.removeOriginal).toBe(true);
 	});
 
 	it("does not auto-propose low confidence matches", async () => {
@@ -435,7 +333,7 @@ describe("searchAllReplacements", () => {
 
 		await searchAllReplacements(store, searchFn);
 
-		expect(store.tracks.value[0]?.checked).toBe(false);
+		expect(store.tracks.value[0]?.intent).toBe("skip");
 		expect(store.tracks.value[0]?.selectedCandidateId).toBeNull();
 	});
 
@@ -454,218 +352,10 @@ describe("searchAllReplacements", () => {
 			makeTrack({ trackUri: "spotify:track:a" }),
 			makeTrack({ trackUri: "spotify:track:b" }),
 		]);
-		const progressValues: { completed: number; total: number }[] = [];
-		const searchFn = vi.fn().mockImplementation(async () => {
-			progressValues.push({ ...store.searchProgress.value });
-			return [];
-		});
+		const searchFn = vi.fn().mockResolvedValue([]);
 
 		await searchAllReplacements(store, searchFn);
 
-		// After final search, progress should be 2/2
 		expect(store.searchProgress.value).toEqual({ completed: 2, total: 2 });
-	});
-});
-
-// --- pendingOps with no-match removals ---
-
-describe("pendingOps — no-match removals", () => {
-	it("generates remove op for checked no-match track", () => {
-		const store = createTriageStore([makeTrack()]);
-		store.tracks.value = store.tracks.value.map((t) => ({
-			...t,
-			candidates: [],
-			searchStatus: "done" as const,
-		}));
-
-		toggleCheck(store, "spotify:track:abc123");
-
-		const ops = store.pendingOps.value;
-		expect(ops).toHaveLength(1);
-		expect(ops[0]?.type).toBe("remove");
-		expect(ops[0]?.trackUri).toBe("spotify:track:abc123");
-	});
-
-	it("does not generate remove op for unchecked no-match track", () => {
-		const store = createTriageStore([makeTrack()]);
-		store.tracks.value = store.tracks.value.map((t) => ({
-			...t,
-			candidates: [],
-			searchStatus: "done" as const,
-		}));
-
-		expect(store.pendingOps.value).toEqual([]);
-	});
-
-	it("does not generate remove op for pending tracks", () => {
-		const store = createTriageStore([makeTrack()]);
-		// searchStatus is "pending" by default, candidates empty
-		store.tracks.value = store.tracks.value.map((t) => ({
-			...t,
-			checked: true,
-		}));
-
-		// No candidates and pending — should not create a no-match removal
-		expect(store.pendingOps.value).toEqual([]);
-	});
-});
-
-// --- sectionCounts ---
-
-describe("sectionCounts", () => {
-	function storeWithMixedTracks() {
-		const store = createTriageStore([
-			makeTrack({ trackUri: "spotify:track:a" }),
-			makeTrack({ trackUri: "spotify:track:b" }),
-			makeTrack({ trackUri: "spotify:track:c" }),
-		]);
-		store.tracks.value = store.tracks.value.map((t, i) => ({
-			...t,
-			candidates: i === 0 ? [makeCandidate(3, "spotify:track:r0")] : [],
-			searchStatus: "done" as const,
-		}));
-		return store;
-	}
-
-	it("counts noMatch tracks", () => {
-		const store = storeWithMixedTracks();
-		expect(store.sectionCounts.value.noMatch).toBe(2);
-	});
-
-	it("counts swapping when swap track is checked", () => {
-		const store = storeWithMixedTracks();
-		toggleCheck(store, "spotify:track:a");
-		expect(store.sectionCounts.value.swapping).toBe(1);
-	});
-
-	it("counts removing when no-match track is checked", () => {
-		const store = storeWithMixedTracks();
-		toggleCheck(store, "spotify:track:b");
-		expect(store.sectionCounts.value.removing).toBe(1);
-	});
-
-	it("counts removing when swap track has removeOriginal", () => {
-		const store = storeWithMixedTracks();
-		toggleCheck(store, "spotify:track:a"); // confidence 3 → auto removeOriginal
-		// swapping=1, removing=1 (for removeOriginal)
-		expect(store.sectionCounts.value.swapping).toBe(1);
-		expect(store.sectionCounts.value.removing).toBe(1);
-	});
-
-	it("returns zeros when nothing checked", () => {
-		const store = storeWithMixedTracks();
-		expect(store.sectionCounts.value).toEqual({ swapping: 0, removing: 0, noMatch: 2 });
-	});
-});
-
-// --- per-section select-all ---
-
-describe("selectAllSwapSection / deselectAllSwapSection", () => {
-	function storeWithMixedTracks() {
-		const store = createTriageStore([
-			makeTrack({ trackUri: "spotify:track:a" }),
-			makeTrack({ trackUri: "spotify:track:b" }),
-			makeTrack({ trackUri: "spotify:track:c" }),
-		]);
-		store.tracks.value = store.tracks.value.map((t, i) => ({
-			...t,
-			candidates: i < 2 ? [makeCandidate(3, `spotify:track:r${i}`)] : [],
-			searchStatus: "done" as const,
-		}));
-		return store;
-	}
-
-	it("selects all swap-section tracks", () => {
-		const store = storeWithMixedTracks();
-		selectAllSwapSection(store);
-
-		expect(store.tracks.value[0]?.checked).toBe(true);
-		expect(store.tracks.value[1]?.checked).toBe(true);
-		// no-match track should remain unchecked
-		expect(store.tracks.value[2]?.checked).toBe(false);
-	});
-
-	it("deselects all swap-section tracks", () => {
-		const store = storeWithMixedTracks();
-		selectAllSwapSection(store);
-		deselectAllSwapSection(store);
-
-		expect(store.tracks.value[0]?.checked).toBe(false);
-		expect(store.tracks.value[1]?.checked).toBe(false);
-	});
-
-	it("does not select applied tracks", () => {
-		const store = storeWithMixedTracks();
-		store.tracks.value = store.tracks.value.map((t, i) => (i === 0 ? { ...t, applied: true } : t));
-		selectAllSwapSection(store);
-
-		expect(store.tracks.value[0]?.checked).toBe(false);
-		expect(store.tracks.value[1]?.checked).toBe(true);
-	});
-
-	it("computes swapSelectAllState correctly", () => {
-		const store = storeWithMixedTracks();
-		expect(store.swapSelectAllState.value).toBe("none");
-
-		toggleCheck(store, "spotify:track:a");
-		expect(store.swapSelectAllState.value).toBe("some");
-
-		toggleCheck(store, "spotify:track:b");
-		expect(store.swapSelectAllState.value).toBe("all");
-	});
-});
-
-describe("selectAllNoMatchSection / deselectAllNoMatchSection", () => {
-	function storeWithNoMatch() {
-		const store = createTriageStore([
-			makeTrack({ trackUri: "spotify:track:a" }),
-			makeTrack({ trackUri: "spotify:track:b" }),
-			makeTrack({ trackUri: "spotify:track:c" }),
-		]);
-		store.tracks.value = store.tracks.value.map((t, i) => ({
-			...t,
-			candidates: i === 0 ? [makeCandidate(2, "spotify:track:r0")] : [],
-			searchStatus: "done" as const,
-		}));
-		return store;
-	}
-
-	it("selects all no-match tracks", () => {
-		const store = storeWithNoMatch();
-		selectAllNoMatchSection(store);
-
-		// Track a has candidates — should remain unchecked
-		expect(store.tracks.value[0]?.checked).toBe(false);
-		expect(store.tracks.value[1]?.checked).toBe(true);
-		expect(store.tracks.value[2]?.checked).toBe(true);
-	});
-
-	it("deselects all no-match tracks", () => {
-		const store = storeWithNoMatch();
-		selectAllNoMatchSection(store);
-		deselectAllNoMatchSection(store);
-
-		expect(store.tracks.value[1]?.checked).toBe(false);
-		expect(store.tracks.value[2]?.checked).toBe(false);
-	});
-
-	it("does not select applied no-match tracks", () => {
-		const store = storeWithNoMatch();
-		store.tracks.value = store.tracks.value.map((t, i) => (i === 1 ? { ...t, applied: true } : t));
-		selectAllNoMatchSection(store);
-
-		expect(store.tracks.value[1]?.checked).toBe(false);
-		expect(store.tracks.value[2]?.checked).toBe(true);
-	});
-
-	it("computes noMatchSelectAllState correctly", () => {
-		const store = storeWithNoMatch();
-		expect(store.noMatchSelectAllState.value).toBe("none");
-
-		toggleCheck(store, "spotify:track:b");
-		expect(store.noMatchSelectAllState.value).toBe("some");
-
-		toggleCheck(store, "spotify:track:c");
-		expect(store.noMatchSelectAllState.value).toBe("all");
 	});
 });

@@ -1,27 +1,35 @@
-// src/triage/summarizeOps.ts — Track-level summary of pending operations
+// src/triage/summarizeOps.ts — Ops grouping and summary
 
 import type { PendingOp } from "./state";
 
-export function summarizeOps(ops: PendingOp[]): string {
-	const trackOps = new Map<string, { add: boolean; remove: boolean }>();
-	for (const op of ops) {
-		const entry = trackOps.get(op.trackId) ?? { add: false, remove: false };
-		entry[op.type === "add" ? "add" : "remove"] = true;
-		trackOps.set(op.trackId, entry);
-	}
+export interface GroupedTrackOps {
+	add?: PendingOp;
+	remove?: PendingOp;
+}
 
-	let swapCount = 0;
-	let addCount = 0;
-	let removeCount = 0;
+export function groupOpsByTrack(ops: PendingOp[]): Map<string, GroupedTrackOps> {
+	const grouped = new Map<string, GroupedTrackOps>();
+	for (const op of ops) {
+		const entry = grouped.get(op.trackId) ?? {};
+		if (op.type === "add") entry.add = op;
+		else entry.remove = op;
+		grouped.set(op.trackId, entry);
+	}
+	return grouped;
+}
+
+export function summarizeOps(ops: PendingOp[]): string {
+	const trackOps = groupOpsByTrack(ops);
+
+	let replacingCount = 0;
+	let removingCount = 0;
 	for (const { add, remove } of trackOps.values()) {
-		if (add && remove) swapCount++;
-		else if (add) addCount++;
-		else removeCount++;
+		if (add && remove) replacingCount++;
+		else if (remove) removingCount++;
 	}
 
 	const parts: string[] = [];
-	if (swapCount > 0) parts.push(`${swapCount} swap${swapCount !== 1 ? "s" : ""}`);
-	if (addCount > 0) parts.push(`${addCount} addition${addCount !== 1 ? "s" : ""}`);
-	if (removeCount > 0) parts.push(`${removeCount} removal${removeCount !== 1 ? "s" : ""}`);
-	return parts.join(" + ");
+	if (replacingCount > 0) parts.push(`Replacing ${replacingCount}`);
+	if (removingCount > 0) parts.push(`removing ${removingCount}`);
+	return parts.join(", ");
 }

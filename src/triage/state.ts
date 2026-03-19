@@ -6,24 +6,16 @@ import type { ReplacementCandidate, UnplayableTrack } from "../types";
 
 // --- Types ---
 
-export type Filter = "all" | "auto-proposed" | "needs-review" | "no-match";
+export type Intent = "skip" | "replace" | "remove";
 
 export interface TriageTrack {
 	id: string;
 	track: UnplayableTrack;
-	checked: boolean;
+	intent: Intent;
 	selectedCandidateId: string | null;
-	removeOriginal: boolean;
 	candidates: ReplacementCandidate[];
 	searchStatus: "pending" | "done";
 	applied: boolean;
-}
-
-export interface FilterCounts {
-	all: number;
-	autoProposed: number;
-	needsReview: number;
-	noMatch: number;
 }
 
 export interface PendingOp {
@@ -44,29 +36,13 @@ export interface SearchProgress {
 	total: number;
 }
 
-export interface SectionCounts {
-	swapping: number;
-	removing: number;
-	noMatch: number;
-}
-
-export type SelectAllState = "none" | "some" | "all";
-
 // --- Store ---
 
 export interface TriageStore {
 	tracks: Signal<TriageTrack[]>;
-	filter: Signal<Filter>;
 	searchProgress: Signal<SearchProgress>;
-	expandedTrackId: Signal<string | null>;
 
-	filteredTracks: ReadonlySignal<TriageTrack[]>;
-	counts: ReadonlySignal<FilterCounts>;
-	sectionCounts: ReadonlySignal<SectionCounts>;
 	pendingOps: ReadonlySignal<PendingOp[]>;
-	selectAllState: ReadonlySignal<SelectAllState>;
-	swapSelectAllState: ReadonlySignal<SelectAllState>;
-	noMatchSelectAllState: ReadonlySignal<SelectAllState>;
 	selectedCount: ReadonlySignal<number>;
 }
 
@@ -75,77 +51,30 @@ function bestCandidateId(candidates: ReplacementCandidate[]): string | null {
 	return best ? best.track.uri : null;
 }
 
-function bestConfidence(candidates: ReplacementCandidate[]): number {
-	return candidates[0]?.confidence ?? 0;
-}
-
-function trackMatchesFilter(t: TriageTrack, filter: Filter): boolean {
-	if (filter === "all") return true;
-	const best = bestConfidence(t.candidates);
-	if (filter === "auto-proposed") return best === 3;
-	if (filter === "needs-review") return best >= 1 && best <= 2;
-	if (filter === "no-match") return t.searchStatus === "done" && t.candidates.length === 0;
-	return true;
-}
-
 export function createTriageStore(unplayableTracks: UnplayableTrack[]): TriageStore {
 	const tracks = signal<TriageTrack[]>(
 		unplayableTracks.map((t) => ({
 			id: t.trackUri,
 			track: t,
-			checked: false,
+			intent: "skip" as const,
 			selectedCandidateId: null,
-			removeOriginal: false,
 			candidates: [],
 			searchStatus: "pending" as const,
 			applied: false,
 		})),
 	);
 
-	const filter = signal<Filter>("all");
 	const searchProgress = signal<SearchProgress>({ completed: 0, total: unplayableTracks.length });
-	const expandedTrackId = signal<string | null>(null);
-
-	const filteredTracks = computed(() =>
-		tracks.value.filter((t) => trackMatchesFilter(t, filter.value)),
-	);
-
-	const counts = computed<FilterCounts>(() => {
-		const all = tracks.value;
-		return {
-			all: all.length,
-			autoProposed: all.filter((t) => bestConfidence(t.candidates) === 3).length,
-			needsReview: all.filter((t) => {
-				const best = bestConfidence(t.candidates);
-				return best >= 1 && best <= 2;
-			}).length,
-			noMatch: all.filter((t) => t.searchStatus === "done" && t.candidates.length === 0).length,
-		};
-	});
-
-	const sectionCounts = computed<SectionCounts>(() => {
-		const all = tracks.value;
-		let swapping = 0;
-		let removing = 0;
-		let noMatch = 0;
-		for (const t of all) {
-			if (t.applied) continue;
-			const isNoMatch = t.searchStatus === "done" && t.candidates.length === 0;
-			if (isNoMatch) noMatch++;
-			if (t.checked && !isNoMatch && t.candidates.length > 0) swapping++;
-			if (t.checked && isNoMatch) removing++;
-			if (t.checked && !isNoMatch && t.removeOriginal) removing++;
-		}
-		return { swapping, removing, noMatch };
-	});
 
 	const pendingOps = computed<PendingOp[]>(() => {
 		const ops: PendingOp[] = [];
 		for (const t of tracks.value) {
-			if (!t.checked || t.applied) continue;
+			if (t.applied) continue;
 			const artistNames = t.track.artists.join(", ");
-			if (t.selectedCandidateId) {
+
+			if (t.intent === "replace" && t.selectedCandidateId) {
 				const candidate = t.candidates.find((c) => c.track.uri === t.selectedCandidateId);
+				// add op
 				ops.push({
 					type: "add",
 					trackId: t.id,
@@ -158,8 +87,17 @@ export function createTriageStore(unplayableTracks: UnplayableTrack[]): TriageSt
 					candidateName: candidate?.track.name,
 					confidence: candidate?.confidence,
 				});
-			}
-			if (t.removeOriginal) {
+				// remove op
+				ops.push({
+					type: "remove",
+					trackId: t.id,
+					trackName: t.track.name,
+					artistNames,
+					source: t.track.source,
+					sourceId: t.track.sourceId,
+					trackUri: t.track.trackUri,
+				});
+			} else if (t.intent === "remove") {
 				ops.push({
 					type: "remove",
 					trackId: t.id,
@@ -170,65 +108,19 @@ export function createTriageStore(unplayableTracks: UnplayableTrack[]): TriageSt
 					trackUri: t.track.trackUri,
 				});
 			}
-			// No-match track checked for removal
-			if (t.candidates.length === 0 && t.searchStatus === "done" && !t.selectedCandidateId) {
-				ops.push({
-					type: "remove",
-					trackId: t.id,
-					trackName: t.track.name,
-					artistNames,
-					source: t.track.source,
-					sourceId: t.track.sourceId,
-					trackUri: t.track.trackUri,
-				});
-			}
+			// intent === "skip" → no ops
 		}
 		return ops;
 	});
 
-	const selectAllState = computed<SelectAllState>(() => {
-		const visible = filteredTracks.value.filter((t) => t.candidates.length > 0 && !t.applied);
-		if (visible.length === 0) return "none";
-		const checkedCount = visible.filter((t) => t.checked).length;
-		if (checkedCount === 0) return "none";
-		if (checkedCount === visible.length) return "all";
-		return "some";
-	});
-
-	const swapSelectAllState = computed<SelectAllState>(() => {
-		const swapTracks = tracks.value.filter((t) => t.candidates.length > 0 && !t.applied);
-		if (swapTracks.length === 0) return "none";
-		const checkedCount = swapTracks.filter((t) => t.checked).length;
-		if (checkedCount === 0) return "none";
-		if (checkedCount === swapTracks.length) return "all";
-		return "some";
-	});
-
-	const noMatchSelectAllState = computed<SelectAllState>(() => {
-		const noMatchTracks = tracks.value.filter(
-			(t) => t.searchStatus === "done" && t.candidates.length === 0 && !t.applied,
-		);
-		if (noMatchTracks.length === 0) return "none";
-		const checkedCount = noMatchTracks.filter((t) => t.checked).length;
-		if (checkedCount === 0) return "none";
-		if (checkedCount === noMatchTracks.length) return "all";
-		return "some";
-	});
-
-	const selectedCount = computed(() => tracks.value.filter((t) => t.checked && !t.applied).length);
+	const selectedCount = computed(
+		() => tracks.value.filter((t) => t.intent !== "skip" && !t.applied).length,
+	);
 
 	return {
 		tracks,
-		filter,
 		searchProgress,
-		expandedTrackId,
-		filteredTracks,
-		counts,
-		sectionCounts,
 		pendingOps,
-		selectAllState,
-		swapSelectAllState,
-		noMatchSelectAllState,
 		selectedCount,
 	};
 }
@@ -243,105 +135,32 @@ function updateTrack(
 	store.tracks.value = store.tracks.value.map((t) => (t.id === id ? updater(t) : t));
 }
 
-export function toggleCheck(store: TriageStore, id: string): void {
-	updateTrack(store, id, (t) => {
-		if (t.applied) return t;
-		const newChecked = !t.checked;
-		if (newChecked) {
-			return {
-				...t,
-				checked: true,
-				selectedCandidateId: t.selectedCandidateId ?? bestCandidateId(t.candidates),
-				removeOriginal: bestConfidence(t.candidates) === 3 ? true : t.removeOriginal,
-			};
-		}
-		return { ...t, checked: false, selectedCandidateId: null, removeOriginal: false };
-	});
-}
-
 export function selectCandidate(store: TriageStore, trackId: string, candidateUri: string): void {
-	updateTrack(store, trackId, (t) => ({
-		...t,
-		checked: true,
-		selectedCandidateId: candidateUri,
-	}));
+	updateTrack(store, trackId, (t) => {
+		if (t.applied) return t;
+		// Toggle off if same candidate re-clicked
+		if (t.intent === "replace" && t.selectedCandidateId === candidateUri) {
+			return { ...t, intent: "skip" as const };
+		}
+		return { ...t, intent: "replace" as const, selectedCandidateId: candidateUri };
+	});
 }
 
-export function toggleRemoveOriginal(store: TriageStore, id: string): void {
-	updateTrack(store, id, (t) => ({ ...t, removeOriginal: !t.removeOriginal }));
-}
-
-export function setFilter(store: TriageStore, f: Filter): void {
-	store.filter.value = f;
-	store.expandedTrackId.value = null;
-}
-
-export function selectAllVisible(store: TriageStore): void {
-	const visibleIds = new Set(
-		store.filteredTracks.value
-			.filter((t) => t.candidates.length > 0 && !t.applied)
-			.map((t) => t.id),
-	);
-	store.tracks.value = store.tracks.value.map((t) => {
-		if (!visibleIds.has(t.id)) return t;
+export function toggleRemove(store: TriageStore, trackId: string): void {
+	updateTrack(store, trackId, (t) => {
+		if (t.applied) return t;
 		return {
 			...t,
-			checked: true,
-			selectedCandidateId: t.selectedCandidateId ?? bestCandidateId(t.candidates),
-			removeOriginal: bestConfidence(t.candidates) === 3 ? true : t.removeOriginal,
+			intent: t.intent === "remove" ? ("skip" as const) : ("remove" as const),
+			selectedCandidateId: null,
 		};
 	});
-}
-
-export function deselectAllVisible(store: TriageStore): void {
-	const visibleIds = new Set(store.filteredTracks.value.map((t) => t.id));
-	store.tracks.value = store.tracks.value.map((t) => {
-		if (!visibleIds.has(t.id)) return t;
-		return { ...t, checked: false, selectedCandidateId: null, removeOriginal: false };
-	});
-}
-
-export function selectAllSwapSection(store: TriageStore): void {
-	store.tracks.value = store.tracks.value.map((t) => {
-		if (t.applied || t.candidates.length === 0) return t;
-		return {
-			...t,
-			checked: true,
-			selectedCandidateId: t.selectedCandidateId ?? bestCandidateId(t.candidates),
-			removeOriginal: bestConfidence(t.candidates) === 3 ? true : t.removeOriginal,
-		};
-	});
-}
-
-export function deselectAllSwapSection(store: TriageStore): void {
-	store.tracks.value = store.tracks.value.map((t) => {
-		if (t.candidates.length === 0) return t;
-		return { ...t, checked: false, selectedCandidateId: null, removeOriginal: false };
-	});
-}
-
-export function selectAllNoMatchSection(store: TriageStore): void {
-	store.tracks.value = store.tracks.value.map((t) => {
-		if (t.applied || t.candidates.length > 0 || t.searchStatus !== "done") return t;
-		return { ...t, checked: true };
-	});
-}
-
-export function deselectAllNoMatchSection(store: TriageStore): void {
-	store.tracks.value = store.tracks.value.map((t) => {
-		if (t.candidates.length > 0 || t.searchStatus !== "done") return t;
-		return { ...t, checked: false };
-	});
-}
-
-export function toggleExpanded(store: TriageStore, id: string): void {
-	store.expandedTrackId.value = store.expandedTrackId.value === id ? null : id;
 }
 
 export function markTracksApplied(store: TriageStore, trackIds: string[]): void {
 	const ids = new Set(trackIds);
 	store.tracks.value = store.tracks.value.map((t) =>
-		ids.has(t.id) ? { ...t, applied: true, checked: false } : t,
+		ids.has(t.id) ? { ...t, applied: true, intent: "skip" as const } : t,
 	);
 }
 
@@ -373,9 +192,8 @@ export async function searchAllReplacements(
 			...t,
 			candidates,
 			searchStatus: "done" as const,
-			checked: isAutoProposal,
+			intent: isAutoProposal ? ("replace" as const) : ("skip" as const),
 			selectedCandidateId: isAutoProposal ? bestCandidateId(candidates) : null,
-			removeOriginal: isAutoProposal,
 		}));
 
 		store.searchProgress.value = { completed: i + 1, total: trackList.length };

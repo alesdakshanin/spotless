@@ -3,7 +3,7 @@
 import { useSignal } from "@preact/signals";
 import { type BatchResult, executeBatch } from "./batch";
 import type { PendingOp } from "./state";
-import { summarizeOps } from "./summarizeOps";
+import { groupOpsByTrack, summarizeOps } from "./summarizeOps";
 
 type ModalState =
 	| { phase: "review" }
@@ -87,11 +87,10 @@ export function ReviewModal({
 	);
 }
 
-interface SwapItem {
+interface ReplaceItem {
 	trackId: string;
 	candidateName: string;
 	source: string;
-	confidence?: 1 | 2 | 3;
 }
 
 interface RemovalItem {
@@ -101,31 +100,17 @@ interface RemovalItem {
 	source: string;
 }
 
-function groupOpsForReview(ops: PendingOp[]): { swaps: SwapItem[]; removals: RemovalItem[] } {
-	const trackOps = new Map<string, { add?: PendingOp; remove?: PendingOp }>();
-	for (const op of ops) {
-		const entry = trackOps.get(op.trackId) ?? {};
-		if (op.type === "add") entry.add = op;
-		else entry.remove = op;
-		trackOps.set(op.trackId, entry);
-	}
+function groupOpsForReview(ops: PendingOp[]): { replaces: ReplaceItem[]; removals: RemovalItem[] } {
+	const trackOps = groupOpsByTrack(ops);
 
-	const swaps: SwapItem[] = [];
+	const replaces: ReplaceItem[] = [];
 	const removals: RemovalItem[] = [];
 	for (const [trackId, { add, remove }] of trackOps) {
 		if (add && remove) {
-			swaps.push({
+			replaces.push({
 				trackId,
 				candidateName: add.candidateName ?? add.trackName,
 				source: add.source,
-				confidence: add.confidence,
-			});
-		} else if (add) {
-			swaps.push({
-				trackId,
-				candidateName: add.candidateName ?? add.trackName,
-				source: add.source,
-				confidence: add.confidence,
 			});
 		} else if (remove) {
 			removals.push({
@@ -136,7 +121,7 @@ function groupOpsForReview(ops: PendingOp[]): { swaps: SwapItem[]; removals: Rem
 			});
 		}
 	}
-	return { swaps, removals };
+	return { replaces, removals };
 }
 
 function ReviewContent({
@@ -150,7 +135,7 @@ function ReviewContent({
 	onCancel: () => void;
 	onApply: () => void;
 }) {
-	const { swaps, removals } = groupOpsForReview(pendingOps);
+	const { replaces, removals } = groupOpsForReview(pendingOps);
 
 	return (
 		<>
@@ -162,29 +147,26 @@ function ReviewContent({
 			</div>
 
 			<div class="flex-1 overflow-y-auto p-5">
-				{swaps.map((item) => (
-					<div key={`swap-${item.trackId}`} class="flex items-center gap-2 py-2">
+				{replaces.map((item) => (
+					<div key={`replace-${item.trackId}`} class="flex items-center gap-2 py-2">
 						<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-accent/20 text-accent">
-							SWAP
+							REPLACE
 						</span>
 						<div class="flex-1 min-w-0">
 							<p class="text-app-text text-[12px] truncate">{item.candidateName}</p>
 							<p class="text-app-muted text-[10px] truncate">→ {item.source}</p>
 						</div>
-						{item.confidence && (
-							<span class="text-amber-400 text-[10px] shrink-0">{"★".repeat(item.confidence)}</span>
-						)}
 					</div>
 				))}
 
-				{swaps.length > 0 && removals.length > 0 && (
+				{replaces.length > 0 && removals.length > 0 && (
 					<div class="border-t border-white/[0.06] my-2" />
 				)}
 
 				{removals.map((item) => (
 					<div key={`rmv-${item.trackId}`} class="flex items-center gap-2 py-2">
 						<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-app-error/20 text-app-error">
-							RMV
+							REMOVE
 						</span>
 						<div class="flex-1 min-w-0">
 							<p class="text-app-text text-[12px] truncate">{item.trackName}</p>

@@ -4,14 +4,11 @@ import { useSignal } from "@preact/signals";
 import type { ScanSummary } from "../types";
 import { ApplyBar } from "./ApplyBar";
 import type { BatchResult } from "./batch";
-import { FilterBar } from "./FilterBar";
 import { MiniPlayer } from "./MiniPlayer";
-import { NoMatchSection } from "./NoMatchSection";
 import { ReviewModal } from "./ReviewModal";
-import { SummaryCounters } from "./SummaryCounters";
-import { SwapSection } from "./SwapSection";
 import type { TriageStore } from "./state";
 import { markTracksApplied } from "./state";
+import { TrackCard } from "./TrackCard";
 
 export function TriageView({
 	store,
@@ -24,16 +21,10 @@ export function TriageView({
 }) {
 	const showModal = useSignal(false);
 	const progress = store.searchProgress.value;
-	const filteredTracks = store.filteredTracks.value;
 	const pendingOps = store.pendingOps.value;
-	const expandedId = store.expandedTrackId.value;
 	const isSearching = progress.completed < progress.total;
-	const activeFilter = store.filter.value;
 
-	const swapTracks = filteredTracks.filter((t) => t.candidates.length > 0);
-	const noMatchTracks = filteredTracks.filter(
-		(t) => t.searchStatus === "done" && t.candidates.length === 0,
-	);
+	const visibleTracks = store.tracks.value.filter((t) => t.searchStatus === "done");
 
 	const handleComplete = (result: BatchResult) => {
 		const appliedTrackIds = result.succeeded.map((op) => op.trackId);
@@ -68,22 +59,11 @@ export function TriageView({
 				</div>
 			</div>
 
-			{/* Summary counters + filter bar */}
-			<div class="w-full max-w-2xl">
-				<SummaryCounters counts={store.sectionCounts.value} />
-				<FilterBar store={store} />
-			</div>
-
-			{/* Track sections */}
-			<div class="w-full max-w-2xl">
-				{swapTracks.length > 0 && activeFilter !== "no-match" && (
-					<SwapSection store={store} tracks={swapTracks} expandedId={expandedId} />
-				)}
-				{noMatchTracks.length > 0 &&
-					activeFilter !== "auto-proposed" &&
-					activeFilter !== "needs-review" && (
-						<NoMatchSection store={store} tracks={noMatchTracks} expandedId={expandedId} />
-					)}
+			{/* Flat card list */}
+			<div class="w-full max-w-2xl flex flex-col gap-3">
+				{visibleTracks.map((t) => (
+					<TrackCard key={t.id} triageTrack={t} store={store} />
+				))}
 			</div>
 
 			{/* Scan again */}
