@@ -390,6 +390,7 @@ describe("startScan()", () => {
 		expect(mountTriageView).toHaveBeenCalledWith(
 			expect.any(HTMLElement),
 			summary,
+			"u1",
 			expect.any(Function),
 		);
 	});

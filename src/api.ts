@@ -89,6 +89,11 @@ export async function post(path: string, body?: unknown): Promise<void> {
 	await request(path, { method: "POST", body });
 }
 
+export async function postJson<T>(path: string, body?: unknown): Promise<T> {
+	const response = await request(path, { method: "POST", body });
+	return response.json() as Promise<T>;
+}
+
 export async function del(path: string, body?: unknown): Promise<void> {
 	await request(path, { method: "DELETE", body });
 }

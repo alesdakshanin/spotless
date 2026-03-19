@@ -12,22 +12,31 @@ type ModalState =
 
 export function ReviewModal({
 	pendingOps,
+	userId,
 	onClose,
 	onComplete,
 }: {
 	pendingOps: PendingOp[];
+	userId: string;
 	onClose: () => void;
 	onComplete: (result: BatchResult) => void;
 }) {
 	const state = useSignal<ModalState>({ phase: "review" });
+	const backupEnabled = useSignal(true);
+	const hasRemoveOps = pendingOps.some((op) => op.type === "remove");
 
 	const handleApply = async () => {
 		const total = pendingOps.length;
 		state.value = { phase: "progress", completed: 0, total };
 
-		const result = await executeBatch(pendingOps, (completed, t) => {
-			state.value = { phase: "progress", completed, total: t };
-		});
+		const result = await executeBatch(
+			pendingOps,
+			userId,
+			(completed, t) => {
+				state.value = { phase: "progress", completed, total: t };
+			},
+			backupEnabled.value,
+		);
 
 		state.value = { phase: "done", result };
 		onComplete(result);
@@ -41,9 +50,14 @@ export function ReviewModal({
 		const total = failedOps.length;
 		state.value = { phase: "progress", completed: 0, total };
 
-		const result = await executeBatch(failedOps, (completed, t) => {
-			state.value = { phase: "progress", completed, total: t };
-		});
+		const result = await executeBatch(
+			failedOps,
+			userId,
+			(completed, t) => {
+				state.value = { phase: "progress", completed, total: t };
+			},
+			backupEnabled.value,
+		);
 
 		// Merge with previous successes
 		const allSucceeded = [...current.result.succeeded, ...result.succeeded];
@@ -70,6 +84,11 @@ export function ReviewModal({
 					<ReviewContent
 						pendingOps={pendingOps}
 						summary={summary}
+						backupEnabled={backupEnabled.value}
+						hasRemoveOps={hasRemoveOps}
+						onBackupChange={(checked) => {
+							backupEnabled.value = checked;
+						}}
 						onCancel={onClose}
 						onApply={handleApply}
 					/>
@@ -127,11 +146,17 @@ function groupOpsForReview(ops: PendingOp[]): { replaces: ReplaceItem[]; removal
 function ReviewContent({
 	pendingOps,
 	summary,
+	backupEnabled,
+	hasRemoveOps,
+	onBackupChange,
 	onCancel,
 	onApply,
 }: {
 	pendingOps: PendingOp[];
 	summary: string;
+	backupEnabled: boolean;
+	hasRemoveOps: boolean;
+	onBackupChange: (checked: boolean) => void;
 	onCancel: () => void;
 	onApply: () => void;
 }) {
@@ -147,6 +172,20 @@ function ReviewContent({
 			</div>
 
 			<div class="flex-1 overflow-y-auto p-5">
+				{hasRemoveOps && (
+					<label class="flex items-center gap-2 mb-4 cursor-pointer select-none">
+						<input
+							type="checkbox"
+							checked={backupEnabled}
+							onChange={(e) => onBackupChange((e.target as HTMLInputElement).checked)}
+							class="accent-accent w-4 h-4 cursor-pointer"
+						/>
+						<span class="text-app-muted text-[12px]">
+							Back up removed tracks to <strong class="text-app-text">Spotless Backup</strong>{" "}
+							playlist
+						</span>
+					</label>
+				)}
 				{replaces.map((item) => (
 					<div key={`replace-${item.trackId}`} class="flex items-center gap-2 py-2">
 						<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-accent/20 text-accent">

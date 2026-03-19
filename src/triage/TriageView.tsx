@@ -13,10 +13,12 @@ import { TrackCard } from "./TrackCard";
 export function TriageView({
 	store,
 	summary,
+	userId,
 	onScanAgain,
 }: {
 	store: TriageStore;
 	summary: ScanSummary;
+	userId: string;
 	onScanAgain: () => void;
 }) {
 	const showModal = useSignal(false);
@@ -93,6 +95,7 @@ export function TriageView({
 			{showModal.value && (
 				<ReviewModal
 					pendingOps={pendingOps}
+					userId={userId}
 					onClose={() => {
 						showModal.value = false;
 					}}

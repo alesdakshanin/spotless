@@ -23,10 +23,12 @@ function getApp(): HTMLDivElement {
 	return app;
 }
 
+let currentUserId = "";
+
 function showTriageView(summary: ScanSummary): void {
 	const app = getApp();
 	app.innerHTML = "";
-	mountTriageView(app, summary, () => {
+	mountTriageView(app, summary, currentUserId, () => {
 		unmountTriageView(app);
 		showScanScreen();
 	});
@@ -34,6 +36,7 @@ function showTriageView(summary: ScanSummary): void {
 
 async function showScanScreen(): Promise<void> {
 	const user = await get<SpotifyUser>("/me");
+	currentUserId = user.id;
 	const displayName = user.display_name ?? "Spotify User";
 	const playlists = await fetchOwnedPlaylists(user.id);
 

@@ -9,11 +9,12 @@ import { TriageView } from "./TriageView";
 export function mountTriageView(
 	container: HTMLElement,
 	summary: ScanSummary,
+	userId: string,
 	onScanAgain: () => void,
 ): void {
 	const store = createTriageStore(summary.unplayable);
 
-	render(h(TriageView, { store, summary, onScanAgain }), container);
+	render(h(TriageView, { store, summary, userId, onScanAgain }), container);
 
 	// Start background search and SDK connection in parallel
 	searchAllReplacements(store);

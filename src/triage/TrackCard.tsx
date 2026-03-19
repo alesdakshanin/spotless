@@ -159,11 +159,7 @@ export function TrackCard({
 				{/* Album art — dimmed to signal unavailable */}
 				<div class="relative w-11 h-11 shrink-0">
 					{track.thumbnailUrl ? (
-						<img
-							src={track.thumbnailUrl}
-							alt=""
-							class="w-11 h-11 rounded-[3px] object-cover"
-						/>
+						<img src={track.thumbnailUrl} alt="" class="w-11 h-11 rounded-[3px] object-cover" />
 					) : (
 						<div class="w-11 h-11 rounded-[3px] bg-app-surface" />
 					)}
