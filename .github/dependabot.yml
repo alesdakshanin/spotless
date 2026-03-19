@@ -4,6 +4,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: vitest
+        versions: [">=4"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
