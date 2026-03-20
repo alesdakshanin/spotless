@@ -7,6 +7,8 @@ updates:
     ignore:
       - dependency-name: vitest
         versions: [">=4"]
+      - dependency-name: "@preact/preset-vite"
+        versions: ["2.10.4"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
