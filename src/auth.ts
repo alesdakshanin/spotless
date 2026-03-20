@@ -40,7 +40,7 @@ export async function login(): Promise<void> {
 	const verifier = generateCodeVerifier();
 	const challenge = await generateCodeChallenge(verifier);
 
-	sessionStorage.setItem("pkce_code_verifier", verifier);
+	localStorage.setItem(STORAGE_KEYS.codeVerifier, verifier);
 
 	const params = new URLSearchParams({
 		client_id: getClientId(),
@@ -63,10 +63,10 @@ export interface TokenResponse {
 }
 
 export async function handleCallback(code: string): Promise<TokenResponse> {
-	const verifier = sessionStorage.getItem("pkce_code_verifier");
+	const verifier = localStorage.getItem(STORAGE_KEYS.codeVerifier);
 	if (!verifier) throw new Error("Missing PKCE code verifier");
 
-	sessionStorage.removeItem("pkce_code_verifier");
+	localStorage.removeItem(STORAGE_KEYS.codeVerifier);
 
 	const response = await fetch(TOKEN_URL, {
 		method: "POST",
@@ -90,6 +90,7 @@ export async function handleCallback(code: string): Promise<TokenResponse> {
 // --- Token storage ---
 
 const STORAGE_KEYS = {
+	codeVerifier: "pkce_code_verifier",
 	accessToken: "spotify_access_token",
 	refreshToken: "spotify_refresh_token",
 	expiresAt: "spotify_expires_at",

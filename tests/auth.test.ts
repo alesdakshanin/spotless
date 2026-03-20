@@ -133,13 +133,29 @@ describe("isTokenExpired", () => {
 	});
 });
 
+// --- localStorage stub (jsdom doesn't provide a full Storage implementation) ---
+
+function createStorageStub(): Storage {
+	const store = new Map<string, string>();
+	return {
+		getItem: (key: string) => store.get(key) ?? null,
+		setItem: (key: string, value: string) => store.set(key, value),
+		removeItem: (key: string) => store.delete(key),
+		clear: () => store.clear(),
+		get length() {
+			return store.size;
+		},
+		key: (index: number) => [...store.keys()][index] ?? null,
+	};
+}
+
 // --- Login redirect ---
 
 describe("login", () => {
 	let capturedHref: string | undefined;
 
 	beforeEach(() => {
-		sessionStorage.clear();
+		vi.stubGlobal("localStorage", createStorageStub());
 		vi.stubEnv("VITE_SPOTIFY_CLIENT_ID", "test_client_id");
 
 		// Capture the href assignment instead of actually navigating
@@ -166,17 +182,16 @@ describe("login", () => {
 	});
 
 	afterEach(() => {
-		sessionStorage.clear();
 		vi.restoreAllMocks();
 		vi.unstubAllEnvs();
 	});
 
-	it("stores PKCE verifier in sessionStorage and redirects to Spotify authorize URL with correct params", async () => {
+	it("stores PKCE verifier in localStorage and redirects to Spotify authorize URL with correct params", async () => {
 		const { login } = await import("../src/auth");
 		await login();
 
 		// Verify verifier was stored
-		const verifier = sessionStorage.getItem("pkce_code_verifier");
+		const verifier = localStorage.getItem("pkce_code_verifier");
 		expect(verifier).toBeTruthy();
 		expect(typeof verifier).toBe("string");
 
@@ -197,12 +212,11 @@ describe("login", () => {
 
 describe("handleCallback", () => {
 	beforeEach(() => {
-		sessionStorage.clear();
+		vi.stubGlobal("localStorage", createStorageStub());
 		vi.stubEnv("VITE_SPOTIFY_CLIENT_ID", "test_client_id");
 	});
 
 	afterEach(() => {
-		sessionStorage.clear();
 		vi.restoreAllMocks();
 		vi.unstubAllEnvs();
 	});
@@ -212,7 +226,7 @@ describe("handleCallback", () => {
 	});
 
 	it("exchanges code for tokens and cleans up verifier", async () => {
-		sessionStorage.setItem("pkce_code_verifier", "test_verifier");
+		localStorage.setItem("pkce_code_verifier", "test_verifier");
 
 		const mockTokens: TokenResponse = {
 			access_token: "new_access",
@@ -232,7 +246,7 @@ describe("handleCallback", () => {
 
 		expect(result.access_token).toBe("new_access");
 		expect(result.refresh_token).toBe("new_refresh");
-		expect(sessionStorage.getItem("pkce_code_verifier")).toBeNull();
+		expect(localStorage.getItem("pkce_code_verifier")).toBeNull();
 
 		const fetchCall = vi.mocked(fetch).mock.calls[0];
 		expect(fetchCall).toBeDefined();
@@ -243,7 +257,7 @@ describe("handleCallback", () => {
 	});
 
 	it("throws on failed token exchange", async () => {
-		sessionStorage.setItem("pkce_code_verifier", "test_verifier");
+		localStorage.setItem("pkce_code_verifier", "test_verifier");
 
 		vi.stubGlobal(
 			"fetch",
