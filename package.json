@@ -16,7 +16,7 @@
 		"check": "tsc --noEmit && biome check && vitest run --coverage"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.4.5",
+		"@biomejs/biome": "^2.4.8",
 		"@tailwindcss/vite": "^4.2.2",
 		"@vitest/coverage-v8": "^3.2.4",
 		"jsdom": "^29.0.0",
